@@ -2,26 +2,26 @@ package com.koldyr.csv.processor;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
-import java.math.BigDecimal;
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.sql.Types;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.StringJoiner;
+import java.util.concurrent.Callable;
 
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.koldyr.csv.Constants;
+import com.koldyr.csv.io.FileToDBPipeline;
+import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.ProcessorContext;
 
 /**
@@ -44,50 +44,72 @@ public class ImportProcessor extends BatchDBProcessor {
         Thread.currentThread().setName(tableName);
         LOGGER.debug("Starting {}", tableName);
 
-        BufferedReader reader = null;
-        PreparedStatement statement = null;
-        try {
+        final String fileName = context.getPath() + '/' + tableName + ".csv";
+
+        try (FileToDBPipeline dataPipeline = new FileToDBPipeline(fileName)) {
             final Connection connection = context.getConnection();
             connection.setSchema(context.getSchema());
 
-            reader = new BufferedReader(new InputStreamReader(new FileInputStream(context.getPath() + '/' + tableName + ".csv"), "UTF-8"));
+            long rowCount = getRowCount(fileName);
 
-            ResultSetMetaData metaData = getMetaData(connection, tableName);
-            String sql = createInsertSql(tableName, metaData);
-            statement = connection.prepareStatement(sql);
-
-            String rowData = reader.readLine();
-            long counter = 0;
-            while (rowData != null) {
-                insertRow(statement, metaData, rowData);
-
-                counter++;
-
-                if (counter % 1000.0 == 0) {
-                    statement.executeBatch();
-                    LOGGER.debug("\t{}", format.format(counter));
-                }
-
-                rowData = reader.readLine();
+            if (rowCount > context.getPageSize()) {
+                parallelImport(connection, dataPipeline, tableName, rowCount);
+            } else {
+                singleImport(connection, dataPipeline, tableName, rowCount);
             }
 
-            statement.executeBatch();
-
-            LOGGER.debug("Finished {}: {} rows in {} msec", tableName, format.format(counter), format.format(System.currentTimeMillis() - start));
+            LOGGER.debug("Finished {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
-        } finally {
-            try {
-                if (reader != null) {
-                    reader.close();
-                }
-                if (statement != null) {
-                    statement.close();
-                }
-            } catch (Exception e) {
-                LOGGER.error(tableName + ": " + e.getMessage(), e);
+        }
+    }
+
+    private long getRowCount(String fileName) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), "UTF-8"))) {
+            return reader.lines().count();
+        }
+    }
+
+    private void parallelImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws InterruptedException, SQLException {
+        int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
+
+        LOGGER.debug("Pages: {}", pageCount);
+
+        List<PageBlockData> pages = new ArrayList<>(pageCount);
+
+        for (int i = 0; i < pageCount; i++) {
+            pages.add(new PageBlockData(i, 0, rowCount));
+        }
+
+        context.setPages(tableName, pages);
+
+        final ResultSetMetaData metaData = getMetaData(connection, tableName);
+        final String insertSql = createInsertSql(tableName, metaData);
+
+        int threadCount = Math.min(Constants.PAGE_TREADS, pageCount);
+        final Collection<Callable<Object>> importThreads = new ArrayList<>(threadCount);
+        for (int i = 0; i < threadCount; i++) {
+            importThreads.add(new PageImportProcessor(context, tableName, metaData, dataPipeline, insertSql));
+        }
+
+        context.getExecutor().invokeAll(importThreads);
+    }
+
+    private void singleImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws SQLException, IOException {
+        ResultSetMetaData metaData = getMetaData(connection, tableName);
+        String sql = createInsertSql(tableName, metaData);
+        PreparedStatement statement = connection.prepareStatement(sql);
+
+        while (dataPipeline.next(statement, metaData)) {
+            if (dataPipeline.counter() % 1000.0 == 0) {
+                statement.executeBatch();
+
+                final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);
+                LOGGER.debug("\t{}%", percent);
             }
         }
+
+        statement.executeBatch();
     }
 
     private String createInsertSql(String tableName, ResultSetMetaData metaData) throws SQLException {
@@ -97,53 +119,6 @@ public class ImportProcessor extends BatchDBProcessor {
         }
 
         return "INSERT INTO \"" + context.getSchema() + "\".\"" + tableName + "\" VALUES (" + values + ')';
-    }
-
-    private void insertRow(PreparedStatement statement, ResultSetMetaData metaData, String rowData) throws SQLException {
-        final String[] values = rowData.split(",");
-        for (int columnIndex = 1; columnIndex <= values.length; columnIndex++) {
-            String value = values[columnIndex - 1];
-            setValue(metaData, statement, columnIndex, value);
-        }
-
-        statement.addBatch();
-    }
-
-    private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
-        final int columnType = metaData.getColumnType(columnIndex);
-        if (StringUtils.isEmpty(value)) {
-            statement.setNull(columnIndex, columnType);
-            return;
-        }
-
-        switch (columnType) {
-            case Types.VARCHAR:
-            case Types.NVARCHAR:
-            case Types.NCHAR:
-            case Types.CHAR:
-                if (value.startsWith("\"") && value.endsWith("\"")) {
-                    statement.setString(columnIndex, value.substring(1, value.length() - 1));
-                } else {
-                    statement.setString(columnIndex, value);
-                }
-                break;
-            case Types.INTEGER:
-                statement.setInt(columnIndex, Integer.parseInt(value));
-                break;
-            case Types.FLOAT:
-                statement.setFloat(columnIndex, Float.parseFloat(value));
-            case Types.DATE:
-                final LocalDate date = (LocalDate) DateTimeFormatter.ISO_LOCAL_DATE.parse(value);
-                statement.setDate(columnIndex, Date.valueOf(date));
-                break;
-            case Types.TIMESTAMP:
-                final LocalDateTime dateTime = (LocalDateTime) DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(value);
-                statement.setTimestamp(columnIndex, Timestamp.valueOf(dateTime));
-            case Types.NUMERIC:
-                statement.setBigDecimal(columnIndex, new BigDecimal(value));
-            default:
-                statement.setObject(columnIndex, value, columnType);
-        }
     }
 
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {

@@ -1,5 +1,7 @@
 package com.koldyr.csv.io;
 
+import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -26,14 +28,16 @@ import org.apache.commons.lang.StringUtils;
  *
  * @created: 2018.03.05
  */
-public class DataPipeline {
+public class DBToFilePipeline implements Closeable {
     private static final byte[] CR = "\n".getBytes();
 
     private final ReadWriteLock writeLock = new ReentrantReadWriteLock();
 
     private final FileChannel fileChannel;
+    private final FileOutputStream output;
 
-    public DataPipeline(FileOutputStream output) {
+    public DBToFilePipeline(String fileName) throws FileNotFoundException {
+        output = new FileOutputStream(fileName);
         fileChannel = output.getChannel();
     }
 
@@ -41,20 +45,27 @@ public class DataPipeline {
         fileChannel.force(false);
     }
 
+    @Override
     public void close() throws IOException {
         fileChannel.close();
+        output.close();
     }
 
-    public void writeRow(ResultSet resultSet, int columnCount) throws SQLException, IOException {
-        final ByteBuffer data = composeRowData(resultSet, columnCount);
+    public boolean next(ResultSet resultSet, int columnCount) throws SQLException, IOException {
+        if (resultSet.next()) {
+            final ByteBuffer data = composeRowData(resultSet, columnCount);
 
-        final Lock lock = writeLock.writeLock();
-        lock.lock();
-        try {
-            writeChannel(data);
-        } finally {
-            lock.unlock();
+            final Lock lock = writeLock.writeLock();
+            lock.lock();
+            try {
+                writeChannel(data);
+            } finally {
+                lock.unlock();
+            }
+            return true;
         }
+
+        return false;
     }
 
     private void writeChannel(ByteBuffer data) throws IOException {
@@ -65,13 +76,13 @@ public class DataPipeline {
     }
 
     private ByteBuffer composeRowData(ResultSet resultSet, int columnCount) throws SQLException, UnsupportedEncodingException {
-        StringJoiner joiner = new StringJoiner(",");
+        StringJoiner rowData = new StringJoiner(",");
         for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
             Object value = getValue(resultSet, columnIndex);
-            joiner.add(value == null ? StringUtils.EMPTY : value.toString());
+            rowData.add(value == null ? StringUtils.EMPTY : StringEscapeUtils.escapeCsv(value.toString()));
         }
 
-        return ByteBuffer.wrap(joiner.toString().getBytes("UTF-8"));
+        return ByteBuffer.wrap(rowData.toString().getBytes("UTF-8"));
     }
 
     private Object getValue(ResultSet resultSet, int columnIndex) throws SQLException {
@@ -87,7 +98,7 @@ public class DataPipeline {
                 if (value == null) return null;
 
                 value = value.trim();
-                return StringUtils.isEmpty(value) ? null : '"' + StringEscapeUtils.escapeCsv(value) + '"';
+                return value;
             case Types.INTEGER:
                 return resultSet.getInt(columnIndex);
             case Types.FLOAT:

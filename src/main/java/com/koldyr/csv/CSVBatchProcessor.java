@@ -40,7 +40,7 @@ public class CSVBatchProcessor {
         LOGGER.debug("Load table names...");
         final List<String> tableNames = loadTableNames();
 
-        final int threadCount = Math.min(10, tableNames.size());
+        final int threadCount = Math.min(Constants.TABLE_TREADS, tableNames.size());
         final ExecutorService executor = Executors.newCachedThreadPool();
 
         BasicDataSource dataSource = new BasicDataSource();
@@ -58,7 +58,7 @@ public class CSVBatchProcessor {
             context.setPath(path);
             context.setSchema(schema);
             context.setExecutor(executor);
-            context.setPageSize(400_000);
+            context.setPageSize(Constants.PAGE_SIZE);
 
             Collection<Callable<Object>> processors = new LinkedList<>();
             for (int i = 0; i < threadCount; i++) {
