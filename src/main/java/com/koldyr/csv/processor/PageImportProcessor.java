@@ -60,14 +60,15 @@ public class PageImportProcessor implements Callable<Object> {
     private void execute(PageBlockData pageBlock) {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
+        Connection connection = null;
         PreparedStatement statement = null;
 
         try {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.getConnection(), 10, 1000, true);
-            final Connection connection = getConnection.call();
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 10, 1000, true);
+            connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
 
@@ -91,6 +92,10 @@ public class PageImportProcessor implements Callable<Object> {
             try {
                 if (statement != null) {
                     statement.close();
+                }
+
+                if (connection != null) {
+                    context.release(connection);
                 }
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);

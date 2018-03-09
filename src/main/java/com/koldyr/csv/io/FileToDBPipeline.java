@@ -29,8 +29,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Description of class FileToDBPipeline
@@ -38,8 +36,6 @@ import org.slf4j.LoggerFactory;
  * @created: 2018.03.07
  */
 public class FileToDBPipeline implements Closeable {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(FileToDBPipeline.class);
 
     private final ReadWriteLock fileLock = new ReentrantReadWriteLock();
 
@@ -61,6 +57,25 @@ public class FileToDBPipeline implements Closeable {
             return false;
         }
 
+        setRowValues(statement, metaData, rowData);
+
+        statement.addBatch();
+
+        return true;
+    }
+
+    private String readLine() throws IOException {
+        final Lock lock = fileLock.readLock();
+        lock.lock();
+        try {
+            counter.incrementAndGet();
+            return reader.readLine();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void setRowValues(PreparedStatement statement, ResultSetMetaData metaData, String rowData) throws SQLException {
         boolean escaped = false;
         int columnIndex = 1;
         CharArrayWriter tokenBuffer = new CharArrayWriter(256);
@@ -89,21 +104,6 @@ public class FileToDBPipeline implements Closeable {
         }
 
         setValue(metaData, statement, columnIndex, tokenBuffer.toString());
-
-        statement.addBatch();
-
-        return true;
-    }
-
-    private String readLine() throws IOException {
-        final Lock lock = fileLock.readLock();
-        lock.lock();
-        try {
-            counter.incrementAndGet();
-            return reader.readLine();
-        } finally {
-            lock.unlock();
-        }
     }
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
