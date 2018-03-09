@@ -15,4 +15,14 @@ public class PageBlockData {
         this.start = start;
         this.length = length;
     }
+
+    @Override
+    public String toString() {
+        final StringBuffer sb = new StringBuffer("PageBlockData{");
+        sb.append("index=").append(index);
+        sb.append(", start=").append(start);
+        sb.append(", length=").append(length);
+        sb.append('}');
+        return sb.toString();
+    }
 }

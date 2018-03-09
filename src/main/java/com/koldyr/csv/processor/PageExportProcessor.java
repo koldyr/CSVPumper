@@ -68,12 +68,10 @@ class PageExportProcessor implements Callable<Object> {
             resultSet = statement.executeQuery(sql);
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
-            final int columnCount = metaData.getColumnCount();
+            final int columnCount = metaData.getColumnCount() - 1;  // remove ROWNUM column
 
             int counter = 0;
-            while (resultSet.next()) {
-                dataPipeline.next(resultSet, columnCount);
-
+            while (dataPipeline.next(resultSet, columnCount)) {
                 counter++;
 
                 if (counter % 1000.0 == 0) {
