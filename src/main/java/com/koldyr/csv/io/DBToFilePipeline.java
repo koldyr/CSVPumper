@@ -47,7 +47,10 @@ public class DBToFilePipeline implements Closeable {
 
     @Override
     public void close() throws IOException {
+        fileChannel.force(true);
         fileChannel.close();
+
+        output.flush();
         output.close();
     }
 

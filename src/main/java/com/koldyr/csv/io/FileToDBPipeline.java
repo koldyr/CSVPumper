@@ -4,6 +4,7 @@
 package com.koldyr.csv.io;
 
 import java.io.BufferedReader;
+import java.io.CharArrayWriter;
 import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.nio.CharBuffer;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
@@ -59,15 +61,34 @@ public class FileToDBPipeline implements Closeable {
             return false;
         }
 
-        final String[] values = rowData.split(",");
-        for (int columnIndex = 1; columnIndex <= values.length; columnIndex++) {
-            String value = values[columnIndex - 1];
-            try {
-                setValue(metaData, statement, columnIndex, value);
-            } catch (Exception e) {
-                LOGGER.error(rowData, e);
+        boolean escaped = false;
+        int columnIndex = 1;
+        CharArrayWriter tokenBuffer = new CharArrayWriter(256);
+        final CharBuffer rowBuffer = CharBuffer.wrap(rowData);
+        while (rowBuffer.hasRemaining()) {
+            final char c = rowBuffer.get();
+
+            if (escaped) {
+                if (c == '"') {
+                    escaped = false;
+                }
+            } else {
+                escaped = c == '"';
             }
+
+            if (c == ',' && !escaped) {
+                setValue(metaData, statement, columnIndex, tokenBuffer.toString());
+
+                tokenBuffer.reset();
+                columnIndex++;
+
+                continue;
+            }
+
+            tokenBuffer.append(c);
         }
+
+        setValue(metaData, statement, columnIndex, tokenBuffer.toString());
 
         statement.addBatch();
 
