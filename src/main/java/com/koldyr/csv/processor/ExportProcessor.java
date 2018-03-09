@@ -38,10 +38,12 @@ public class ExportProcessor extends BatchDBProcessor {
         Thread.currentThread().setName(tableName);
 
         final String fileName = context.getPath() + '/' + tableName + ".csv";
+
+        Connection connection = null;
         try (DBToFilePipeline dataPipeline = new DBToFilePipeline(fileName)) {
-            final Connection connection = context.getConnection();
+            connection = context.get();
             long rowCount = getRowCount(connection, tableName);
-            LOGGER.debug("Starting {}: {}", tableName, format.format(rowCount));
+            LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount));
 
 
             if (rowCount > context.getPageSize()) {
@@ -50,9 +52,17 @@ public class ExportProcessor extends BatchDBProcessor {
                 export(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished {}: {} rows in {} msec", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
+        } finally {
+            if (connection != null) {
+                try {
+                    context.release(connection);
+                } catch (Exception e) {
+                    LOGGER.error(e.getMessage(), e);
+                }
+            }
         }
     }
 
@@ -96,7 +106,7 @@ public class ExportProcessor extends BatchDBProcessor {
 
         context.setPages(tableName, pages);
 
-        int threadCount = Math.min(Constants.PAGE_TREADS, pageCount);
+        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Object>> exportThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             exportThreads.add(new PageExportProcessor(context, tableName, dataPipeline));

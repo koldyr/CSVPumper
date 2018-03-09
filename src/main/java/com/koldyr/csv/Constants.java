@@ -9,7 +9,7 @@ package com.koldyr.csv;
  * @created: 2018.03.08
  */
 public class Constants {
-    public static final long PAGE_SIZE = 1_000;
-    public static final int TABLE_TREADS = 10;
-    public static final int PAGE_TREADS = 45;
+    public static final long PAGE_SIZE = 1_000_000;
+    public static final int PARALLEL_TABLES = 6;
+    public static final int PARALLEL_PAGES = 8;
 }

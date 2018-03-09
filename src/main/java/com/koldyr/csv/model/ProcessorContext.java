@@ -1,7 +1,6 @@
 package com.koldyr.csv.model;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,7 +9,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import javax.sql.DataSource;
+import org.apache.commons.pool2.ObjectPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Description of class ProcessorConfig
@@ -18,11 +19,12 @@ import javax.sql.DataSource;
  * @created: 2018.03.04
  */
 public class ProcessorContext {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProcessorContext.class);
 
     private final ReadWriteLock queueLock = new ReentrantReadWriteLock();
     private final ReadWriteLock pagesLock = new ReentrantReadWriteLock();
 
-    private final DataSource dataSource;
+    private final ObjectPool<Connection> connectionsPool;
     private final List<String> tableNames;
     private String schema;
     private String path;
@@ -31,8 +33,8 @@ public class ProcessorContext {
     private long pageSize;
     private Map<String, List<PageBlockData>> pages = new ConcurrentHashMap<>(0);
 
-    public ProcessorContext(DataSource dataSource, List<String> tableNames) {
-        this.dataSource = dataSource;
+    public ProcessorContext(ObjectPool<Connection> connectionsPool, List<String> tableNames) {
+        this.connectionsPool = connectionsPool;
         this.tableNames = tableNames;
     }
 
@@ -93,7 +95,13 @@ public class ProcessorContext {
         }
     }
 
-    public Connection getConnection() throws SQLException {
-        return dataSource.getConnection();
+    public Connection get() throws Exception {
+        final Connection connection = connectionsPool.borrowObject();
+        LOGGER.debug("Active connections: {}", connectionsPool.getNumActive());
+        return connection;
+    }
+
+    public void release(Connection connection) throws Exception {
+        connectionsPool.returnObject(connection);
     }
 }

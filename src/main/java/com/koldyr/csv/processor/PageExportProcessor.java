@@ -1,5 +1,6 @@
 package com.koldyr.csv.processor;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
@@ -51,16 +52,16 @@ class PageExportProcessor implements Callable<Object> {
     private void execute(PageBlockData pageBlock) {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
+        Connection connection = null;
         Statement statement = null;
         ResultSet resultSet = null;
-
         try {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Statement> getStatement = new CallWithRetry<>(() -> context.getConnection().createStatement(),
-                    10, 1000, true);
-            statement = getStatement.call();
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get,10, 1000, true);
+            connection = getConnection.call();
+            statement = connection.createStatement();
 
             String sql = "SELECT * FROM (SELECT subQ.*, rownum RNUM FROM ( SELECT * FROM " + context.getSchema() + '.' + tableName +
                     ") subQ WHERE rownum <= " + (pageBlock.start + pageBlock.length) + ") WHERE RNUM > " + pageBlock.start;
@@ -83,7 +84,7 @@ class PageExportProcessor implements Callable<Object> {
 
             dataPipeline.flush();
 
-            LOGGER.debug("Finished {} page {} in {} msec", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
+            LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
@@ -93,6 +94,9 @@ class PageExportProcessor implements Callable<Object> {
                 }
                 if (statement != null) {
                     statement.close();
+                }
+                if (connection != null) {
+                    context.release(connection);
                 }
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);

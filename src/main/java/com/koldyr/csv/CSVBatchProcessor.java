@@ -3,7 +3,7 @@ package com.koldyr.csv;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.SQLException;
+import java.sql.Connection;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -12,10 +12,14 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.pool2.ObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.koldyr.csv.db.ConnectionsFactory;
+import com.koldyr.csv.model.ConnectionData;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.ExportProcessor;
 import com.koldyr.csv.processor.ImportProcessor;
@@ -40,21 +44,22 @@ public class CSVBatchProcessor {
         LOGGER.debug("Load table names...");
         final List<String> tableNames = loadTableNames();
 
-        final int threadCount = Math.min(Constants.TABLE_TREADS, tableNames.size());
+        final int threadCount = Math.min(Constants.PARALLEL_TABLES, tableNames.size());
         final ExecutorService executor = Executors.newCachedThreadPool();
 
-        BasicDataSource dataSource = new BasicDataSource();
-        dataSource.setMaxTotal(100);
-        dataSource.setTimeBetweenEvictionRunsMillis(5000);
-        dataSource.setMinEvictableIdleTimeMillis(1000 * 60);
-        dataSource.setUrl(url);
-        dataSource.setUsername(user);
-        dataSource.setPassword(password);
+        final ConnectionsFactory factory = new ConnectionsFactory(new ConnectionData(url, user, password));
+        final GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+        config.setMaxTotal(100);
+        config.setMaxIdle(1);
+        config.setMinEvictableIdleTimeMillis(100);
+        config.setNumTestsPerEvictionRun(100);
+        config.setTimeBetweenEvictionRunsMillis(1000);
+        ObjectPool<Connection> connectionsPool = new GenericObjectPool<>(factory, config);
 
         try {
             LOGGER.debug("Create processors");
 
-            ProcessorContext context = new ProcessorContext(dataSource, tableNames);
+            ProcessorContext context = new ProcessorContext(connectionsPool, tableNames);
             context.setPath(path);
             context.setSchema(schema);
             context.setExecutor(executor);
@@ -65,15 +70,12 @@ public class CSVBatchProcessor {
                 processors.add(createProcessor(operation, context));
             }
 
+            LOGGER.debug("Start...");
             executor.invokeAll(processors);
         } catch (InterruptedException e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
-            try {
-                dataSource.close();
-            } catch (SQLException e) {
-                LOGGER.error(e.getMessage(), e);
-            }
+            connectionsPool.close();
             executor.shutdown();
         }
     }

@@ -42,12 +42,13 @@ public class ImportProcessor extends BatchDBProcessor {
         long start = System.currentTimeMillis();
 
         Thread.currentThread().setName(tableName);
-        LOGGER.debug("Starting {}", tableName);
+        LOGGER.debug("Starting table {}", tableName);
+
+        Connection connection = null;
 
         final String fileName = context.getPath() + '/' + tableName + ".csv";
-
         try (FileToDBPipeline dataPipeline = new FileToDBPipeline(fileName)) {
-            final Connection connection = context.getConnection();
+            connection = context.get();
             connection.setSchema(context.getSchema());
 
             long rowCount = getRowCount(fileName);
@@ -58,9 +59,17 @@ public class ImportProcessor extends BatchDBProcessor {
                 singleImport(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
+        } finally {
+            if (connection != null) {
+                try {
+                    context.release(connection);
+                } catch (Exception e) {
+                    LOGGER.error(e.getMessage(), e);
+                }
+            }
         }
     }
 
@@ -86,7 +95,7 @@ public class ImportProcessor extends BatchDBProcessor {
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
         final String insertSql = createInsertSql(tableName, metaData);
 
-        int threadCount = Math.min(Constants.PAGE_TREADS, pageCount);
+        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Object>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             importThreads.add(new PageImportProcessor(context, tableName, metaData, dataPipeline, insertSql));
