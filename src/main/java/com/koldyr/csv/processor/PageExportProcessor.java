@@ -1,12 +1,11 @@
 package com.koldyr.csv.processor;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.concurrent.Callable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,36 +19,18 @@ import com.koldyr.csv.model.ProcessorContext;
  *
  * @created: 2018.03.05
  */
-class PageExportProcessor implements Callable<Object> {
+public class PageExportProcessor extends BasePageProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(PageExportProcessor.class);
 
-    private final ProcessorContext context;
-    private final String tableName;
     private final DBToFilePipeline dataPipeline;
-    private final DecimalFormat format;
 
     public PageExportProcessor(ProcessorContext context, String tableName, DBToFilePipeline dataPipeline) {
-        this.context = context;
-        this.tableName = tableName;
+        super(tableName, context);
         this.dataPipeline = dataPipeline;
-
-        final DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols();
-        decimalFormatSymbols.setGroupingSeparator(',');
-        format = new DecimalFormat("###,###,###,###", decimalFormatSymbols);
     }
 
     @Override
-    public Object call() {
-        PageBlockData pageBlock = context.getNextPageBlock(tableName);
-        while (pageBlock != null) {
-            execute(pageBlock);
-            pageBlock = context.getNextPageBlock(tableName);
-        }
-
-        return null;
-    }
-
-    private void execute(PageBlockData pageBlock) {
+    protected void execute(PageBlockData pageBlock) throws SQLException, IOException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
         Connection connection = null;
@@ -59,7 +40,7 @@ class PageExportProcessor implements Callable<Object> {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get,10, 1000, true);
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get,30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
 
@@ -85,8 +66,6 @@ class PageExportProcessor implements Callable<Object> {
             dataPipeline.flush();
 
             LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
         } finally {
             try {
                 if (resultSet != null) {

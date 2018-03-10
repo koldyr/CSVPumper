@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,12 +108,14 @@ public class ExportProcessor extends BatchDBProcessor {
         context.setPages(tableName, pages);
 
         int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
-        final Collection<Callable<Object>> exportThreads = new ArrayList<>(threadCount);
+        final Collection<Callable<Integer>> exportThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             exportThreads.add(new PageExportProcessor(context, tableName, dataPipeline));
         }
 
-        context.getExecutor().invokeAll(exportThreads);
+        final List<Future<Integer>> results = context.getExecutor().invokeAll(exportThreads);
+
+        checkResults(tableName, pageCount, results);
     }
 
     private long getRowCount(Connection connection, String tableName) throws SQLException {

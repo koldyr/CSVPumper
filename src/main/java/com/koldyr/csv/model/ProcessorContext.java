@@ -103,5 +103,6 @@ public class ProcessorContext {
 
     public void release(Connection connection) throws Exception {
         connectionsPool.returnObject(connection);
+        LOGGER.debug("Active connections: {}", connectionsPool.getNumActive());
     }
 }
