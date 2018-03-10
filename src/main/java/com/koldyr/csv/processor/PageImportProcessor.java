@@ -3,12 +3,11 @@
  */
 package com.koldyr.csv.processor;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.concurrent.Callable;
+import java.sql.SQLException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,42 +21,24 @@ import com.koldyr.csv.model.ProcessorContext;
  *
  * @created: 2018.03.07
  */
-public class PageImportProcessor implements Callable<Object> {
+public class PageImportProcessor extends BasePageProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PageImportProcessor.class);
 
-    private final ProcessorContext context;
-    private final String tableName;
     private final ResultSetMetaData metaData;
     private final FileToDBPipeline dataPipeline;
     private final String insertSql;
-    private final DecimalFormat format;
 
     public PageImportProcessor(ProcessorContext context, String tableName, ResultSetMetaData metaData, FileToDBPipeline dataPipeline, String insertSql) {
-        this.context = context;
-        this.tableName = tableName;
+        super(tableName, context);
         this.metaData = metaData;
 
         this.dataPipeline = dataPipeline;
         this.insertSql = insertSql;
-
-        final DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols();
-        decimalFormatSymbols.setGroupingSeparator(',');
-        format = new DecimalFormat("###,###,###,###", decimalFormatSymbols);
     }
 
     @Override
-    public Object call() {
-        PageBlockData pageBlock = context.getNextPageBlock(tableName);
-        while (pageBlock != null) {
-            execute(pageBlock);
-            pageBlock = context.getNextPageBlock(tableName);
-        }
-
-        return null;
-    }
-
-    private void execute(PageBlockData pageBlock) {
+    protected void execute(PageBlockData pageBlock) throws SQLException, IOException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
         Connection connection = null;
@@ -67,7 +48,7 @@ public class PageImportProcessor implements Callable<Object> {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 10, 1000, true);
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 30, 1000, true);
             connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
@@ -86,8 +67,6 @@ public class PageImportProcessor implements Callable<Object> {
             statement.executeBatch();
 
             LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
         } finally {
             try {
                 if (statement != null) {

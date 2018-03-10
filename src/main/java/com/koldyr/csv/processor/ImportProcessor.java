@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,12 +97,14 @@ public class ImportProcessor extends BatchDBProcessor {
         final String insertSql = createInsertSql(tableName, metaData);
 
         int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
-        final Collection<Callable<Object>> importThreads = new ArrayList<>(threadCount);
+        final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             importThreads.add(new PageImportProcessor(context, tableName, metaData, dataPipeline, insertSql));
         }
 
-        context.getExecutor().invokeAll(importThreads);
+        final List<Future<Integer>> results = context.getExecutor().invokeAll(importThreads);
+
+        checkResults(tableName, pageCount, results);
     }
 
     private void singleImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws SQLException, IOException {

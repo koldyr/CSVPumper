@@ -5,9 +5,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -103,6 +103,6 @@ public class CSVBatchProcessor {
             LOGGER.error(e.getMessage(), e);
         }
 
-        return new Stack<>();
+        return Collections.emptyList();
     }
 }
