@@ -22,6 +22,7 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -57,7 +58,11 @@ public class FileToDBPipeline implements Closeable {
             return false;
         }
 
-        setRowValues(statement, metaData, rowData);
+        try {
+            setRowValues(statement, metaData, rowData);
+        } catch (Exception e) {
+            throw new SQLException(rowData, e);
+        }
 
         statement.addBatch();
 
@@ -124,17 +129,28 @@ public class FileToDBPipeline implements Closeable {
             case Types.INTEGER:
                 statement.setInt(columnIndex, Integer.parseInt(v));
                 break;
+            case Types.BIGINT:
+                statement.setLong(columnIndex, Long.parseLong(v));
+                break;
             case Types.FLOAT:
                 statement.setFloat(columnIndex, Float.parseFloat(v));
+                break;
             case Types.DATE:
-                final LocalDate date = (LocalDate) DateTimeFormatter.ISO_LOCAL_DATE.parse(v);
+                LocalDate date;
+                try {
+                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE);
+                } catch (DateTimeParseException e) {
+                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                }
                 statement.setDate(columnIndex, Date.valueOf(date));
                 break;
             case Types.TIMESTAMP:
-                final LocalDateTime dateTime = (LocalDateTime) DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(v);
+                final LocalDateTime dateTime = LocalDateTime.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 statement.setTimestamp(columnIndex, Timestamp.valueOf(dateTime));
+                break;
             case Types.NUMERIC:
                 statement.setBigDecimal(columnIndex, new BigDecimal(v));
+                break;
             default:
                 statement.setObject(columnIndex, v, columnType);
         }

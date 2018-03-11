@@ -44,8 +44,8 @@ public class ExportProcessor extends BatchDBProcessor {
         try (DBToFilePipeline dataPipeline = new DBToFilePipeline(fileName)) {
             connection = context.get();
             long rowCount = getRowCount(connection, tableName);
-            LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount));
 
+            LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount));
 
             if (rowCount > context.getPageSize()) {
                 parallelExport(dataPipeline, tableName, rowCount);
