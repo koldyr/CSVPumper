@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
@@ -37,6 +39,9 @@ import org.apache.commons.lang.StringUtils;
  * @created: 2018.03.07
  */
 public class FileToDBPipeline implements Closeable {
+
+    private static final Pattern CR_TEMPLATE = Pattern.compile("\\\\n");
+    private static final String CR_REPLACEMENT = "\n";
 
     private final ReadWriteLock fileLock = new ReentrantReadWriteLock();
 
@@ -119,6 +124,11 @@ public class FileToDBPipeline implements Closeable {
         }
 
         String v = StringEscapeUtils.unescapeCsv(value);
+        final Matcher matcher = CR_TEMPLATE.matcher(v);
+        if (matcher.find()) {
+            v = matcher.replaceAll(CR_REPLACEMENT);
+        }
+
         switch (columnType) {
             case Types.VARCHAR:
             case Types.NVARCHAR:
