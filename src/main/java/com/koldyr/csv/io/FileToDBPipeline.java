@@ -118,9 +118,17 @@ public class FileToDBPipeline implements Closeable {
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
         final int columnType = metaData.getColumnType(columnIndex);
-        if (StringUtils.isEmpty(value)) {
-            statement.setNull(columnIndex, columnType);
-            return;
+
+        if (isString(columnType)) {
+            if (value == null) {
+                statement.setNull(columnIndex, columnType);
+                return;
+            }
+        } else {
+            if (StringUtils.isEmpty(value)) {
+                statement.setNull(columnIndex, columnType);
+                return;
+            }
         }
 
         String v = StringEscapeUtils.unescapeCsv(value);
@@ -164,6 +172,10 @@ public class FileToDBPipeline implements Closeable {
             default:
                 statement.setObject(columnIndex, v, columnType);
         }
+    }
+
+    private boolean isString(int columnType) {
+        return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
     }
 
     @Override

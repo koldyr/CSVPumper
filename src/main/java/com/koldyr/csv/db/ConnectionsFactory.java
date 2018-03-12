@@ -22,6 +22,7 @@ public class ConnectionsFactory extends BasePooledObjectFactory<Connection> {
     private final ConnectionData connectionData;
 
     public ConnectionsFactory(ConnectionData connectionData) {
+        super();
         this.connectionData = connectionData;
     }
 
@@ -33,5 +34,12 @@ public class ConnectionsFactory extends BasePooledObjectFactory<Connection> {
     @Override
     public PooledObject<Connection> wrap(Connection obj) {
         return new DefaultPooledObject<>(obj);
+    }
+
+    @Override
+    public void destroyObject(PooledObject<Connection> p) throws Exception {
+        if (p != null && p.getObject() != null) {
+            p.getObject().close();
+        }
     }
 }
