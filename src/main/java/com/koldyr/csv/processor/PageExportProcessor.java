@@ -55,7 +55,10 @@ public class PageExportProcessor extends BasePageProcessor {
             resultSet = statement.executeQuery(sql);
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
-            final int columnCount = metaData.getColumnCount() - 1;  // remove ROWNUM column
+            int columnCount = metaData.getColumnCount();
+            if (sql.contains("RNUM")) {// remove ROWNUM column
+                columnCount--;
+            }
 
             int counter = 0;
             while (dataPipeline.next(resultSet, columnCount)) {
