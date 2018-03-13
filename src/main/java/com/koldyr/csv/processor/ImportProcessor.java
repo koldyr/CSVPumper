@@ -108,12 +108,14 @@ public class ImportProcessor extends BatchDBProcessor {
     }
 
     private void singleImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws SQLException, IOException {
+        final double step = context.getPageSize() / 100.0;
+
         ResultSetMetaData metaData = getMetaData(connection, tableName);
         String sql = createInsertSql(tableName, metaData);
         PreparedStatement statement = connection.prepareStatement(sql);
 
         while (dataPipeline.next(statement, metaData)) {
-            if (dataPipeline.counter() % 1000.0 == 0) {
+            if (dataPipeline.counter() % step == 0) {
                 statement.executeBatch();
 
                 final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);

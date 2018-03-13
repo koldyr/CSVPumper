@@ -22,10 +22,13 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
@@ -36,6 +39,9 @@ import org.apache.commons.lang.StringUtils;
  * @created: 2018.03.07
  */
 public class FileToDBPipeline implements Closeable {
+
+    private static final Pattern CR_TEMPLATE = Pattern.compile("\\\\n");
+    private static final String CR_REPLACEMENT = "\n";
 
     private final ReadWriteLock fileLock = new ReentrantReadWriteLock();
 
@@ -57,7 +63,11 @@ public class FileToDBPipeline implements Closeable {
             return false;
         }
 
-        setRowValues(statement, metaData, rowData);
+        try {
+            setRowValues(statement, metaData, rowData);
+        } catch (Exception e) {
+            throw new SQLException(rowData, e);
+        }
 
         statement.addBatch();
 
@@ -108,12 +118,25 @@ public class FileToDBPipeline implements Closeable {
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
         final int columnType = metaData.getColumnType(columnIndex);
-        if (StringUtils.isEmpty(value)) {
-            statement.setNull(columnIndex, columnType);
-            return;
+
+        if (isString(columnType)) {
+            if (value == null) {
+                statement.setNull(columnIndex, columnType);
+                return;
+            }
+        } else {
+            if (StringUtils.isEmpty(value)) {
+                statement.setNull(columnIndex, columnType);
+                return;
+            }
         }
 
         String v = StringEscapeUtils.unescapeCsv(value);
+        final Matcher matcher = CR_TEMPLATE.matcher(v);
+        if (matcher.find()) {
+            v = matcher.replaceAll(CR_REPLACEMENT);
+        }
+
         switch (columnType) {
             case Types.VARCHAR:
             case Types.NVARCHAR:
@@ -124,20 +147,35 @@ public class FileToDBPipeline implements Closeable {
             case Types.INTEGER:
                 statement.setInt(columnIndex, Integer.parseInt(v));
                 break;
+            case Types.BIGINT:
+                statement.setLong(columnIndex, Long.parseLong(v));
+                break;
             case Types.FLOAT:
                 statement.setFloat(columnIndex, Float.parseFloat(v));
+                break;
             case Types.DATE:
-                final LocalDate date = (LocalDate) DateTimeFormatter.ISO_LOCAL_DATE.parse(v);
+                LocalDate date;
+                try {
+                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE);
+                } catch (DateTimeParseException e) {
+                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                }
                 statement.setDate(columnIndex, Date.valueOf(date));
                 break;
             case Types.TIMESTAMP:
-                final LocalDateTime dateTime = (LocalDateTime) DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(v);
+                final LocalDateTime dateTime = LocalDateTime.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 statement.setTimestamp(columnIndex, Timestamp.valueOf(dateTime));
+                break;
             case Types.NUMERIC:
                 statement.setBigDecimal(columnIndex, new BigDecimal(v));
+                break;
             default:
                 statement.setObject(columnIndex, v, columnType);
         }
+    }
+
+    private boolean isString(int columnType) {
+        return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
     }
 
     @Override

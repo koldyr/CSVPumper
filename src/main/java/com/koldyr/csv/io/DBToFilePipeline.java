@@ -19,6 +19,8 @@ import java.util.StringJoiner;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
@@ -30,6 +32,9 @@ import org.apache.commons.lang.StringUtils;
  */
 public class DBToFilePipeline implements Closeable {
     private static final byte[] CR = "\n".getBytes();
+
+    private static final Pattern CR_TEMPLATE = Pattern.compile("\n");
+    private static final String CR_REPLACEMENT = "\\\\n";
 
     private final ReadWriteLock writeLock = new ReentrantReadWriteLock();
 
@@ -100,8 +105,11 @@ public class DBToFilePipeline implements Closeable {
                 String value = resultSet.getString(columnIndex);
                 if (value == null) return null;
 
-                value = value.trim();
-                return value;
+                final Matcher crMatcher = CR_TEMPLATE.matcher(value);
+                if (crMatcher.find()) {
+                    value = crMatcher.replaceAll(CR_REPLACEMENT);
+                }
+                return value.trim();
             case Types.INTEGER:
                 return resultSet.getInt(columnIndex);
             case Types.FLOAT:

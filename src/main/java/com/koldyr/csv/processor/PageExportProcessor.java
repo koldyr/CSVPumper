@@ -33,6 +33,8 @@ public class PageExportProcessor extends BasePageProcessor {
     protected void execute(PageBlockData pageBlock) throws SQLException, IOException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
+        final double step = context.getPageSize() / 100.0;
+
         Connection connection = null;
         Statement statement = null;
         ResultSet resultSet = null;
@@ -56,7 +58,7 @@ public class PageExportProcessor extends BasePageProcessor {
             while (dataPipeline.next(resultSet, columnCount)) {
                 counter++;
 
-                if (counter % 1000.0 == 0) {
+                if (counter % step == 0) {
                     dataPipeline.flush();
                     final long percent = Math.round(counter / (double) pageBlock.length * 100.0);
                     LOGGER.debug("\t{}%", percent);
