@@ -41,6 +41,8 @@ public class PageImportProcessor extends BasePageProcessor {
     protected void execute(PageBlockData pageBlock) throws SQLException, IOException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
+        final double step = context.getPageSize() / 100.0;
+
         Connection connection = null;
         PreparedStatement statement = null;
 
@@ -57,7 +59,7 @@ public class PageImportProcessor extends BasePageProcessor {
             while (dataPipeline.next(statement, metaData)) {
                 counter++;
 
-                if (counter % 100.0 == 0) {
+                if (counter % step == 0) {
                     statement.executeBatch();
                     final long percent = Math.round(dataPipeline.counter() / (double) pageBlock.length * 100.0);
                     LOGGER.debug("\t{}%", percent);

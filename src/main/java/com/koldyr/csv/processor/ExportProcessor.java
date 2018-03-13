@@ -68,6 +68,8 @@ public class ExportProcessor extends BatchDBProcessor {
     }
 
     private void export(Connection connection, DBToFilePipeline dataPipeline, String tableName, double rowCount) throws SQLException, IOException {
+        final double step = context.getPageSize() / 100.0;
+
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
             resultSet = statement.executeQuery("SELECT * FROM " + context.getSchema() + '.' + tableName);
@@ -79,7 +81,7 @@ public class ExportProcessor extends BatchDBProcessor {
             while (dataPipeline.next(resultSet, columnCount)) {
                 counter++;
 
-                if (counter % 1000.0 == 0) {
+                if (counter % step == 0) {
                     dataPipeline.flush();
                     final long percent = Math.round(counter / rowCount * 100.0);
                     LOGGER.debug("\t{}%", percent);
