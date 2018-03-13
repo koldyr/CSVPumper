@@ -7,12 +7,18 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import oracle.jdbc.OracleConnection;
 
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.ProcessorContext;
+import com.mysql.cj.api.jdbc.JdbcConnection;
+
+import com.microsoft.sqlserver.jdbc.ISQLServerConnection;
 
 /**
  * Description of class PageExportProcessor
@@ -42,17 +48,19 @@ public class PageExportProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get,30, 2000, true);
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
 
-            String sql = "SELECT * FROM (SELECT subQ.*, rownum RNUM FROM ( SELECT * FROM " + context.getSchema() + '.' + tableName +
-                    ") subQ WHERE rownum <= " + (pageBlock.start + pageBlock.length) + ") WHERE RNUM > " + pageBlock.start;
+            String sql = getPageSQL(connection, pageBlock);
 
             resultSet = statement.executeQuery(sql);
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
-            final int columnCount = metaData.getColumnCount() - 1;  // remove ROWNUM column
+            int columnCount = metaData.getColumnCount();
+            if (sql.contains("RNUM")) {// remove ROWNUM column
+                columnCount--;
+            }
 
             int counter = 0;
             while (dataPipeline.next(resultSet, columnCount)) {
@@ -83,5 +91,42 @@ public class PageExportProcessor extends BasePageProcessor {
                 LOGGER.error(e.getMessage(), e);
             }
         }
+    }
+
+    private String getPageSQL(Connection connection, PageBlockData pageBlock) {
+        boolean oracle = isOracle(connection);
+        if (oracle) {
+            return "SELECT * FROM (SELECT subQ.*, rownum RNUM FROM ( SELECT * FROM " + context.getSchema() + '.' + tableName +
+                    ") subQ WHERE rownum <= " + (pageBlock.start + pageBlock.length) + ") WHERE RNUM > " + pageBlock.start;
+        }
+
+        boolean msSQLServer = isMsSQLServer(connection);
+        if (msSQLServer) {
+            return "SELECT * FROM " + context.getSchema() + '.' + tableName + " OFFSET " + pageBlock.start + " ROWS FETCH NEXT " + pageBlock.length + " ROWS ONLY";
+        }
+
+        boolean mySQL = isMySql(connection);
+        boolean postgreSQL = isPostgreSQL(connection);
+        if (postgreSQL || mySQL) {
+            return "SELECT * FROM " + context.getSchema() + '.' + tableName + " LIMIT " + pageBlock.length + " OFFSET " + pageBlock.start;
+        }
+
+        return "SELECT * FROM " + context.getSchema() + '.' + tableName;
+    }
+
+    private boolean isPostgreSQL(Connection connection) {
+        return connection instanceof BaseConnection;
+    }
+
+    private boolean isMySql(Connection connection) {
+        return connection instanceof JdbcConnection;
+    }
+
+    private boolean isMsSQLServer(Connection connection) {
+        return connection instanceof ISQLServerConnection;
+    }
+
+    private boolean isOracle(Connection connection) {
+        return connection instanceof OracleConnection;
     }
 }
