@@ -48,6 +48,9 @@ public class ExportProcessor extends BatchDBProcessor {
             LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount));
 
             if (rowCount > context.getPageSize()) {
+                context.release(connection);
+                connection = null;
+
                 parallelExport(dataPipeline, tableName, rowCount);
             } else {
                 export(connection, dataPipeline, tableName, rowCount);
@@ -125,7 +128,7 @@ public class ExportProcessor extends BatchDBProcessor {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT count(*) FROM " + context.getSchema() + '.' + tableName);
+            resultSet = statement.executeQuery("SELECT count(1) FROM " + context.getSchema() + '.' + tableName);
 
             if (resultSet.next()) {
                 rowCount = resultSet.getLong(1);

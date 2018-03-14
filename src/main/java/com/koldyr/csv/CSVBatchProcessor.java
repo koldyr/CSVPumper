@@ -1,6 +1,8 @@
 package com.koldyr.csv;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
@@ -8,6 +10,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,17 +47,12 @@ public class CSVBatchProcessor {
         LOGGER.debug("Load table names...");
         final List<String> tableNames = loadTableNames();
 
+        loadConfig();
+
         final int threadCount = Math.min(Constants.PARALLEL_TABLES, tableNames.size());
         final ExecutorService executor = Executors.newCachedThreadPool();
 
-        final ConnectionsFactory factory = new ConnectionsFactory(new ConnectionData(url, user, password));
-        final GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-        config.setMaxTotal(100);
-        config.setMaxIdle(1);
-        config.setMinEvictableIdleTimeMillis(100);
-        config.setNumTestsPerEvictionRun(100);
-        config.setTimeBetweenEvictionRunsMillis(1000);
-        ObjectPool<Connection> connectionsPool = new GenericObjectPool<>(factory, config);
+        ObjectPool<Connection> connectionsPool = createConnectionsPool(url, user, password);
 
         try {
             LOGGER.debug("Create processors");
@@ -80,6 +78,30 @@ public class CSVBatchProcessor {
         }
     }
 
+    private static void loadConfig() {
+        try {
+            Properties config = new Properties();
+            config.load(new FileInputStream("config.properties"));
+            Constants.MAX_CONNECTIONS = Integer.parseInt(config.getProperty("max-connections"));
+            Constants.PAGE_SIZE = Long.parseLong(config.getProperty("page-size"));
+            Constants.PARALLEL_TABLES = Integer.parseInt(config.getProperty("parallel-tables"));
+            Constants.PARALLEL_PAGES = Integer.parseInt(config.getProperty("parallel-pages"));
+        } catch (IOException e) {
+            LOGGER.error(e.getMessage(), e);
+        }
+    }
+
+    private static ObjectPool<Connection> createConnectionsPool(String url, String user, String password) {
+        final ConnectionsFactory factory = new ConnectionsFactory(new ConnectionData(url, user, password));
+        final GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+        config.setMaxTotal(Constants.MAX_CONNECTIONS);
+        config.setMaxIdle(1);
+        config.setMinEvictableIdleTimeMillis(100);
+        config.setNumTestsPerEvictionRun(100);
+        config.setTimeBetweenEvictionRunsMillis(1000);
+        return new GenericObjectPool<>(factory, config);
+    }
+
     private static Callable<Object> createProcessor(String operation, ProcessorContext commonConfig) {
         if (operation.equals("export")) {
             return new ExportProcessor(commonConfig);
@@ -88,7 +110,18 @@ public class CSVBatchProcessor {
     }
 
     private static List<String> loadTableNames() {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(CSVBatchProcessor.class.getResourceAsStream("/tables.txt")))) {
+        File tables = new File("tables.txt");
+        if (!tables.exists()) {
+            LOGGER.warn("No tables.txt file found");
+            try {
+                tables.createNewFile();
+            } catch (IOException e) {
+                LOGGER.error(e.getMessage(), e);
+            }
+            return Collections.emptyList();
+        }
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(tables)))) {
             List<String> result = new LinkedList<>();
 
             String line = reader.readLine();
