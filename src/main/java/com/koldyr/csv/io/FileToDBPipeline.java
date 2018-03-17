@@ -40,7 +40,7 @@ import org.apache.commons.lang.StringUtils;
  */
 public class FileToDBPipeline implements Closeable {
 
-    private static final Pattern CR_TEMPLATE = Pattern.compile("\\\\n");
+    private static final Pattern CARRIAGE_RETURN = Pattern.compile("\\\\n");
     private static final String CR_REPLACEMENT = "\n";
 
     private final ReadWriteLock fileLock = new ReentrantReadWriteLock();
@@ -132,9 +132,9 @@ public class FileToDBPipeline implements Closeable {
         }
 
         String v = StringEscapeUtils.unescapeCsv(value);
-        final Matcher matcher = CR_TEMPLATE.matcher(v);
-        if (matcher.find()) {
-            v = matcher.replaceAll(CR_REPLACEMENT);
+        final Matcher carriageReturn = CARRIAGE_RETURN.matcher(v);
+        if (carriageReturn.find()) {
+            v = carriageReturn.replaceAll(CR_REPLACEMENT);
         }
 
         switch (columnType) {
