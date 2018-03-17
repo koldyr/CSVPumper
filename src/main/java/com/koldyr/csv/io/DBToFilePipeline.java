@@ -31,7 +31,7 @@ public class DBToFilePipeline implements Closeable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DBToFilePipeline.class);
 
-    private static final Pattern CR_TEMPLATE = Pattern.compile("\n");
+    private static final Pattern CARRIAGE_RETURN = Pattern.compile("[\n\r]+");
     private static final String CR_REPLACEMENT = "\\\\n";
 
     private final BufferedWriter output;
@@ -81,9 +81,9 @@ public class DBToFilePipeline implements Closeable {
                 String value = resultSet.getString(columnIndex);
                 if (value == null) return null;
 
-                final Matcher crMatcher = CR_TEMPLATE.matcher(value);
-                if (crMatcher.find()) {
-                    value = crMatcher.replaceAll(CR_REPLACEMENT);
+                final Matcher carriageReturn = CARRIAGE_RETURN.matcher(value);
+                if (carriageReturn.find()) {
+                    value = carriageReturn.replaceAll(CR_REPLACEMENT);
                 }
                 return value.trim();
             case Types.INTEGER:
