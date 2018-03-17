@@ -42,13 +42,14 @@ public class PageImportProcessor extends BasePageProcessor {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
         final double step = context.getPageSize() / 100.0;
+        final double totalRowCount = pageBlock.length;
 
         Connection connection = null;
         PreparedStatement statement = null;
 
         try {
             long startPage = System.currentTimeMillis();
-            LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
+            LOGGER.debug("Starting {} page {}", tableName, pageBlock.index);
 
             final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 30, 1000, true);
             connection = getConnection.call();
@@ -60,8 +61,10 @@ public class PageImportProcessor extends BasePageProcessor {
                 counter++;
 
                 if (counter % step == 0) {
-                    statement.executeBatch();
-                    final long percent = Math.round(dataPipeline.counter() / (double) pageBlock.length * 100.0);
+                    final CallWithRetry<int[]> executeBatch = new CallWithRetry<>(statement::executeBatch, 3, 1000, false);
+                    executeBatch.call();
+
+                    final long percent = Math.round(dataPipeline.counter() / totalRowCount * 100.0);
                     LOGGER.debug("\t{}%", percent);
                 }
             }

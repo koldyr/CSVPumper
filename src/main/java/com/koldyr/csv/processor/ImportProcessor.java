@@ -87,7 +87,8 @@ public class ImportProcessor extends BatchDBProcessor {
 
         List<PageBlockData> pages = new ArrayList<>(pageCount);
 
-        for (int i = 0; i < pageCount; i++) {
+        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
+        for (int i = 0; i < threadCount; i++) {
             pages.add(new PageBlockData(i, 0, rowCount));
         }
 
@@ -96,7 +97,6 @@ public class ImportProcessor extends BatchDBProcessor {
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
         final String insertSql = createInsertSql(tableName, metaData);
 
-        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             importThreads.add(new PageImportProcessor(context, tableName, metaData, dataPipeline, insertSql));
