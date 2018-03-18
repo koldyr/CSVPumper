@@ -91,12 +91,12 @@ public abstract class BatchDBProcessor implements Callable<Object> {
         }
     }
 
-    protected String createInsertSql(String tableName, int columnCount) {
+    public static String createInsertSql(String schema, String tableName, int columnCount) {
         StringJoiner values = new StringJoiner(",");
         for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
             values.add("?");
         }
 
-        return "INSERT INTO \"" + context.getSchema() + "\".\"" + tableName + "\" VALUES (" + values + ')';
+        return "INSERT INTO \"" + schema + "\".\"" + tableName + "\" VALUES (" + values + ')';
     }
 }

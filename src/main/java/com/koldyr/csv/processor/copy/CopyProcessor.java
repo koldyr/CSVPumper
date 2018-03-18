@@ -8,11 +8,18 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.koldyr.csv.Constants;
 import com.koldyr.csv.io.DbToDbPipeline;
+import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BatchDBProcessor;
@@ -66,15 +73,37 @@ public class CopyProcessor extends BatchDBProcessor {
         }
     }
 
-    private void parallelCopy(DbToDbPipeline dataPipeline, String tableName, long rowCount) {
+    private void parallelCopy(DbToDbPipeline dataPipeline, String tableName, long rowCount) throws InterruptedException {
+        int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
 
+        LOGGER.debug("Copy {} pages", pageCount);
+
+        List<PageBlockData> pages = new ArrayList<>(pageCount);
+
+        for (int i = 0; i < pageCount; i++) {
+            long start = i * context.getPageSize();
+            long length = Math.min(context.getPageSize(), rowCount - start);
+            pages.add(new PageBlockData(i, start, length));
+        }
+
+        context.setPages(tableName, pages);
+
+        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
+        final Collection<Callable<Integer>> copyThreads = new ArrayList<>(threadCount);
+        for (int i = 0; i < threadCount; i++) {
+            copyThreads.add(new PageCopyProcessor(context, tableName, dataPipeline));
+        }
+
+        final List<Future<Integer>> results = context.getExecutor().invokeAll(copyThreads);
+
+        checkResults(tableName, pageCount, results);
     }
 
     private void copy(Connection srcConnection, Connection dstConnection, DbToDbPipeline dataPipeline, String tableName, long rowCount) throws SQLException {
         final double step = context.getPageSize() / 100.0;
 
         int columnCount = getColumnCount(srcConnection, tableName);
-        String insertSql = createInsertSql(tableName, columnCount);
+        String insertSql = createInsertSql(context.getSchema(), tableName, columnCount);
         ResultSet resultSet = null;
         try (Statement srcStatement = srcConnection.createStatement();
              PreparedStatement dstStatement = dstConnection.prepareStatement(insertSql)) {

@@ -78,7 +78,7 @@ public class ImportProcessor extends BatchDBProcessor {
     private void parallelImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws InterruptedException, SQLException {
         int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
 
-        LOGGER.debug("Pages: {}", pageCount);
+        LOGGER.debug("Import {} pages", pageCount);
 
         List<PageBlockData> pages = new ArrayList<>(pageCount);
 
@@ -90,7 +90,7 @@ public class ImportProcessor extends BatchDBProcessor {
         context.setPages(tableName, pages);
 
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
-        final String insertSql = createInsertSql(tableName, metaData.getColumnCount());
+        final String insertSql = createInsertSql(context.getSchema(), tableName, metaData.getColumnCount());
 
         final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
@@ -106,7 +106,7 @@ public class ImportProcessor extends BatchDBProcessor {
         final double step = context.getPageSize() / 100.0;
 
         ResultSetMetaData metaData = getMetaData(connection, tableName);
-        String sql = createInsertSql(tableName, metaData.getColumnCount());
+        String sql = createInsertSql(context.getSchema(), tableName, metaData.getColumnCount());
         PreparedStatement statement = connection.prepareStatement(sql);
 
         while (dataPipeline.next(statement, metaData)) {
