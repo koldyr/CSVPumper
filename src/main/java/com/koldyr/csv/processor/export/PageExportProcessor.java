@@ -1,4 +1,4 @@
-package com.koldyr.csv.processor;
+package com.koldyr.csv.processor.export;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -15,7 +15,10 @@ import oracle.jdbc.OracleConnection;
 
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
+import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
+import com.koldyr.csv.processor.BasePageProcessor;
+import com.koldyr.csv.processor.CallWithRetry;
 import com.mysql.cj.api.jdbc.JdbcConnection;
 
 import com.microsoft.sqlserver.jdbc.ISQLServerConnection;
@@ -48,7 +51,7 @@ public class PageExportProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page  {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 30, 2000, true);
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
 
@@ -85,7 +88,7 @@ public class PageExportProcessor extends BasePageProcessor {
                     statement.close();
                 }
                 if (connection != null) {
-                    context.release(connection);
+                    context.release(PoolType.SOURCE, connection);
                 }
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);

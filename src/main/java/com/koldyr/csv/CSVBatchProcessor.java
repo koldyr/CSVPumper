@@ -15,17 +15,20 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.commons.pool2.ObjectPool;
-import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.apache.commons.pool2.KeyedObjectPool;
+import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
+import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.koldyr.csv.db.ConnectionsFactory;
 import com.koldyr.csv.model.ConnectionData;
+import com.koldyr.csv.model.Operation;
+import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
-import com.koldyr.csv.processor.ExportProcessor;
-import com.koldyr.csv.processor.ImportProcessor;
+import com.koldyr.csv.processor.copy.CopyProcessor;
+import com.koldyr.csv.processor.export.ExportProcessor;
+import com.koldyr.csv.processor.imprt.ImportProcessor;
 
 /**
  * Description of class CSVExport
@@ -36,13 +39,18 @@ public class CSVBatchProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CSVBatchProcessor.class);
 
-    public static void main(String[] args) {
-        String url = args[0];
-        String user = args[1];
-        String password = args[2];
-        String operation = args.length > 3 ? args[3] : "export";
-        String schema = args.length > 4 ? args[4] : "GEO";
-        String path = args.length > 5 ? args[5] : ".";
+    public static void main(String[] args) throws IOException {
+        Properties params = new Properties();
+
+        try (FileInputStream inputStream = new FileInputStream("params.properties")) {
+            params.load(inputStream);
+        }
+
+        final Operation operation = Operation.valueOf(params.getProperty("operation"));
+        final ConnectionData srcConfig = getDBConfig(params, "source");
+        final ConnectionData dstConfig = getDBConfig(params, "destination");
+        final String schema = params.getProperty("schema");
+        final String path = params.getProperty("path");
 
         LOGGER.debug("Load table names...");
         final List<String> tableNames = loadTableNames();
@@ -52,7 +60,7 @@ public class CSVBatchProcessor {
         final int threadCount = Math.min(Constants.PARALLEL_TABLES, tableNames.size());
         final ExecutorService executor = Executors.newCachedThreadPool();
 
-        ObjectPool<Connection> connectionsPool = createConnectionsPool(url, user, password);
+        KeyedObjectPool<PoolType, Connection> connectionsPool = createConnectionsPool(srcConfig, dstConfig);
 
         try {
             LOGGER.debug("Create processors");
@@ -78,6 +86,12 @@ public class CSVBatchProcessor {
         }
     }
 
+    private static ConnectionData getDBConfig(Properties params, String prefix) {
+        return new ConnectionData(params.getProperty(prefix + ".url"),
+                params.getProperty(prefix + ".user"),
+                params.getProperty(prefix + ".password"));
+    }
+
     private static void loadConfig() {
         try {
             Properties config = new Properties();
@@ -91,22 +105,28 @@ public class CSVBatchProcessor {
         }
     }
 
-    private static ObjectPool<Connection> createConnectionsPool(String url, String user, String password) {
-        final ConnectionsFactory factory = new ConnectionsFactory(new ConnectionData(url, user, password));
-        final GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-        config.setMaxTotal(Constants.MAX_CONNECTIONS);
-        config.setMaxIdle(1);
+    private static KeyedObjectPool<PoolType, Connection> createConnectionsPool(ConnectionData srcConfig, ConnectionData dstConfig) {
+        final ConnectionsFactory factory = new ConnectionsFactory(srcConfig, dstConfig);
+        final GenericKeyedObjectPoolConfig config = new GenericKeyedObjectPoolConfig();
+        config.setMaxTotalPerKey(Constants.MAX_CONNECTIONS);
+        config.setMaxIdlePerKey(1);
         config.setMinEvictableIdleTimeMillis(100);
         config.setNumTestsPerEvictionRun(100);
         config.setTimeBetweenEvictionRunsMillis(1000);
-        return new GenericObjectPool<>(factory, config);
+        return new GenericKeyedObjectPool<>(factory, config);
     }
 
-    private static Callable<Object> createProcessor(String operation, ProcessorContext commonConfig) {
-        if (operation.equals("export")) {
-            return new ExportProcessor(commonConfig);
+    private static Callable<Object> createProcessor(Operation operation, ProcessorContext commonConfig) {
+        switch (operation) {
+            case EXPORT:
+                return new ExportProcessor(commonConfig);
+            case IMPORT:
+                return new ImportProcessor(commonConfig);
+            case COPY:
+                return new CopyProcessor(commonConfig);
         }
-        return new ImportProcessor(commonConfig);
+
+        throw new IllegalArgumentException("Unsupported operation " + operation);
     }
 
     private static List<String> loadTableNames() {

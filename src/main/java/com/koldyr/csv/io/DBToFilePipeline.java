@@ -19,8 +19,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Description of class DataTransfer
@@ -28,8 +26,6 @@ import org.slf4j.LoggerFactory;
  * @created: 2018.03.05
  */
 public class DBToFilePipeline implements Closeable {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(DBToFilePipeline.class);
 
     private static final Pattern CARRIAGE_RETURN = Pattern.compile("[\n\r]+");
     private static final String CR_REPLACEMENT = "\\\\n";

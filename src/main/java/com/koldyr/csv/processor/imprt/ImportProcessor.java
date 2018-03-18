@@ -1,4 +1,4 @@
-package com.koldyr.csv.processor;
+package com.koldyr.csv.processor.imprt;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -13,7 +13,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -23,7 +22,9 @@ import org.slf4j.LoggerFactory;
 import com.koldyr.csv.Constants;
 import com.koldyr.csv.io.FileToDBPipeline;
 import com.koldyr.csv.model.PageBlockData;
+import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
+import com.koldyr.csv.processor.BatchDBProcessor;
 
 /**
  * Description of class ImportProcessor
@@ -49,7 +50,7 @@ public class ImportProcessor extends BatchDBProcessor {
 
         final String fileName = context.getPath() + '/' + tableName + ".csv";
         try (FileToDBPipeline dataPipeline = new FileToDBPipeline(fileName)) {
-            connection = context.get();
+            connection = context.get(PoolType.DESTINATION);
             connection.setSchema(context.getSchema());
 
             long rowCount = getRowCount(fileName);
@@ -64,13 +65,7 @@ public class ImportProcessor extends BatchDBProcessor {
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
-            if (connection != null) {
-                try {
-                    context.release(connection);
-                } catch (Exception e) {
-                    LOGGER.error(e.getMessage(), e);
-                }
-            }
+            release(connection, PoolType.DESTINATION);
         }
     }
 
@@ -95,7 +90,7 @@ public class ImportProcessor extends BatchDBProcessor {
         context.setPages(tableName, pages);
 
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
-        final String insertSql = createInsertSql(tableName, metaData);
+        final String insertSql = createInsertSql(tableName, metaData.getColumnCount());
 
         final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
@@ -111,7 +106,7 @@ public class ImportProcessor extends BatchDBProcessor {
         final double step = context.getPageSize() / 100.0;
 
         ResultSetMetaData metaData = getMetaData(connection, tableName);
-        String sql = createInsertSql(tableName, metaData);
+        String sql = createInsertSql(tableName, metaData.getColumnCount());
         PreparedStatement statement = connection.prepareStatement(sql);
 
         while (dataPipeline.next(statement, metaData)) {
@@ -124,15 +119,6 @@ public class ImportProcessor extends BatchDBProcessor {
         }
 
         statement.executeBatch();
-    }
-
-    private String createInsertSql(String tableName, ResultSetMetaData metaData) throws SQLException {
-        StringJoiner values = new StringJoiner(",");
-        for (int columnIndex = 1; columnIndex <= metaData.getColumnCount(); columnIndex++) {
-            values.add("?");
-        }
-
-        return "INSERT INTO \"" + context.getSchema() + "\".\"" + tableName + "\" VALUES (" + values + ')';
     }
 
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {
