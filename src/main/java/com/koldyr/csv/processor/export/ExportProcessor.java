@@ -1,4 +1,4 @@
-package com.koldyr.csv.processor;
+package com.koldyr.csv.processor.export;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 import com.koldyr.csv.Constants;
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
+import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
+import com.koldyr.csv.processor.BatchDBProcessor;
 
 /**
  * Description of class ExportProcessor
@@ -42,14 +44,14 @@ public class ExportProcessor extends BatchDBProcessor {
 
         Connection connection = null;
         try (DBToFilePipeline dataPipeline = new DBToFilePipeline(fileName)) {
-            connection = context.get();
+            connection = context.get(PoolType.SOURCE);
             long rowCount = getRowCount(connection, tableName);
 
             LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount));
 
             if (rowCount > context.getPageSize()) {
-                context.release(connection);
-                connection = null;
+                release(connection, PoolType.SOURCE);
+                connection = null; //don't release this connection in finally block
 
                 parallelExport(dataPipeline, tableName, rowCount);
             } else {
@@ -60,13 +62,7 @@ public class ExportProcessor extends BatchDBProcessor {
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
-            if (connection != null) {
-                try {
-                    context.release(connection);
-                } catch (Exception e) {
-                    LOGGER.error(e.getMessage(), e);
-                }
-            }
+            release(connection, PoolType.SOURCE);
         }
     }
 
@@ -100,7 +96,7 @@ public class ExportProcessor extends BatchDBProcessor {
     private void parallelExport(DBToFilePipeline dataPipeline, String tableName, long rowCount) throws InterruptedException {
         int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
 
-        LOGGER.debug("Pages: {}", pageCount);
+        LOGGER.debug("Export {} pages", pageCount);
 
         List<PageBlockData> pages = new ArrayList<>(pageCount);
 
@@ -121,23 +117,5 @@ public class ExportProcessor extends BatchDBProcessor {
         final List<Future<Integer>> results = context.getExecutor().invokeAll(exportThreads);
 
         checkResults(tableName, pageCount, results);
-    }
-
-    private long getRowCount(Connection connection, String tableName) throws SQLException {
-        long rowCount = 0;
-
-        ResultSet resultSet = null;
-        try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT count(1) FROM " + context.getSchema() + '.' + tableName);
-
-            if (resultSet.next()) {
-                rowCount = resultSet.getLong(1);
-            }
-        } finally {
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        }
-        return rowCount;
     }
 }

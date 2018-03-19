@@ -1,7 +1,7 @@
 /*
  * (c) 2012-2018 Swiss Re. All rights reserved.
  */
-package com.koldyr.csv.processor;
+package com.koldyr.csv.processor.imprt;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -14,7 +14,10 @@ import org.slf4j.LoggerFactory;
 
 import com.koldyr.csv.io.FileToDBPipeline;
 import com.koldyr.csv.model.PageBlockData;
+import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
+import com.koldyr.csv.processor.BasePageProcessor;
+import com.koldyr.csv.processor.CallWithRetry;
 
 /**
  * Description of class PageImportProcessor
@@ -51,7 +54,7 @@ public class PageImportProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(context::get, 30, 1000, true);
+            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.DESTINATION), 30, 1000, true);
             connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
@@ -79,7 +82,7 @@ public class PageImportProcessor extends BasePageProcessor {
                 }
 
                 if (connection != null) {
-                    context.release(connection);
+                    context.release(PoolType.DESTINATION, connection);
                 }
             } catch (Exception e) {
                 LOGGER.error(e.getMessage(), e);

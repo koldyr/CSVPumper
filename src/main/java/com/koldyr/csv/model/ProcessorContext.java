@@ -9,7 +9,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.commons.pool2.ObjectPool;
+import org.apache.commons.pool2.KeyedObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +24,7 @@ public class ProcessorContext {
     private final ReadWriteLock queueLock = new ReentrantReadWriteLock();
     private final ReadWriteLock pagesLock = new ReentrantReadWriteLock();
 
-    private final ObjectPool<Connection> connectionsPool;
+    private final KeyedObjectPool<PoolType, Connection> connectionsPool;
     private final List<String> tableNames;
     private String schema;
     private String path;
@@ -33,7 +33,7 @@ public class ProcessorContext {
     private long pageSize;
     private Map<String, List<PageBlockData>> pages = new ConcurrentHashMap<>(0);
 
-    public ProcessorContext(ObjectPool<Connection> connectionsPool, List<String> tableNames) {
+    public ProcessorContext(KeyedObjectPool<PoolType, Connection> connectionsPool, List<String> tableNames) {
         this.connectionsPool = connectionsPool;
         this.tableNames = tableNames;
     }
@@ -95,14 +95,14 @@ public class ProcessorContext {
         }
     }
 
-    public Connection get() throws Exception {
-        final Connection connection = connectionsPool.borrowObject();
-        LOGGER.debug("Active connections: {}", connectionsPool.getNumActive());
+    public Connection get(PoolType type) throws Exception {
+        final Connection connection = connectionsPool.borrowObject(type);
+        LOGGER.debug("Active {} connections: {}", type, connectionsPool.getNumActive(type));
         return connection;
     }
 
-    public void release(Connection connection) throws Exception {
-        connectionsPool.returnObject(connection);
-        LOGGER.debug("Active connections: {}", connectionsPool.getNumActive());
+    public void release(PoolType type, Connection connection) throws Exception {
+        connectionsPool.returnObject(type, connection);
+        LOGGER.debug("Active {} connections: {}", type, connectionsPool.getNumActive(type));
     }
 }
