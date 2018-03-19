@@ -96,7 +96,7 @@ public class ExportProcessor extends BatchDBProcessor {
     private void parallelExport(DBToFilePipeline dataPipeline, String tableName, long rowCount) throws InterruptedException {
         int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
 
-        LOGGER.debug("Pages: {}", pageCount);
+        LOGGER.debug("Export {} pages", pageCount);
 
         List<PageBlockData> pages = new ArrayList<>(pageCount);
 

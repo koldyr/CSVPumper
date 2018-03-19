@@ -91,7 +91,7 @@ public abstract class BatchDBProcessor implements Callable<Object> {
         }
     }
 
-    public static String createInsertSql(String schema, String tableName, int columnCount) {
+    protected String createInsertSql(String schema, String tableName, int columnCount) {
         StringJoiner values = new StringJoiner(",");
         for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
             values.add("?");

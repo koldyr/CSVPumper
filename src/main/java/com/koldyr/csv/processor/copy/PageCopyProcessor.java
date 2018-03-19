@@ -6,14 +6,11 @@ package com.koldyr.csv.processor.copy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.koldyr.csv.processor.BatchDBProcessor.createInsertSql;
 
 import com.koldyr.csv.io.DbToDbPipeline;
 import com.koldyr.csv.model.PageBlockData;
@@ -31,10 +28,12 @@ public class PageCopyProcessor extends BasePageProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(PageCopyProcessor.class);
 
     private final DbToDbPipeline dataPipeline;
+    private final String sqlInsert;
 
-    public PageCopyProcessor(ProcessorContext context, String tableName, DbToDbPipeline dataPipeline) {
+    public PageCopyProcessor(ProcessorContext context, String tableName, DbToDbPipeline dataPipeline, String sqlInsert) {
         super(tableName, context);
         this.dataPipeline = dataPipeline;
+        this.sqlInsert = sqlInsert;
     }
 
     @Override
@@ -62,16 +61,8 @@ public class PageCopyProcessor extends BasePageProcessor {
 
             srcResultSet = srcStatement.executeQuery(sqlGetPage);
 
-            final ResultSetMetaData metaData = srcResultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            if (sqlGetPage.contains("RNUM")) {// remove ROWNUM column
-                columnCount--;
-            }
-
             final CallWithRetry<Connection> getDstConnection = new CallWithRetry<>(() -> context.get(PoolType.DESTINATION), 30, 2000, true);
             dstConnection = getDstConnection.call();
-
-            final String sqlInsert = createInsertSql(context.getSchema(), tableName, columnCount);
             dstStatement = dstConnection.prepareStatement(sqlInsert);
 
             int counter = 0;

@@ -73,7 +73,7 @@ public class CopyProcessor extends BatchDBProcessor {
         }
     }
 
-    private void parallelCopy(DbToDbPipeline dataPipeline, String tableName, long rowCount) throws InterruptedException {
+    private void parallelCopy(DbToDbPipeline dataPipeline, String tableName, long rowCount) throws Exception {
         int pageCount = (int) Math.ceil(rowCount / (double) context.getPageSize());
 
         LOGGER.debug("Copy {} pages", pageCount);
@@ -88,10 +88,21 @@ public class CopyProcessor extends BatchDBProcessor {
 
         context.setPages(tableName, pages);
 
+        int columnCount;
+        Connection connection = null;
+        try {
+            connection = context.get(PoolType.SOURCE);
+            columnCount = getColumnCount(connection, tableName);
+        } finally {
+            context.release(PoolType.SOURCE, connection);
+        }
+
+        final String sqlInsert = createInsertSql(context.getSchema(), tableName, columnCount);
+
         int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> copyThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
-            copyThreads.add(new PageCopyProcessor(context, tableName, dataPipeline));
+            copyThreads.add(new PageCopyProcessor(context, tableName, dataPipeline, sqlInsert));
         }
 
         final List<Future<Integer>> results = context.getExecutor().invokeAll(copyThreads);
