@@ -9,6 +9,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 
+import oracle.jdbc.OracleResultSet;
+
 /**
  * Description of class DbToDBPipeline
  *
@@ -34,7 +36,13 @@ public class DbToDbPipeline {
 
     private void copyValues(ResultSet source, PreparedStatement destination) throws SQLException {
         ResultSetMetaData metaData = source.getMetaData();
-        for (int columnIndex = 1; columnIndex <= metaData.getColumnCount(); columnIndex++) {
+        int columnCount = metaData.getColumnCount();
+
+        if (isOracle(source)) {
+            columnCount--;
+        }
+
+        for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
             final int columnType = metaData.getColumnType(columnIndex);
             if (isString(columnType)) {
                 final String value = source.getString(columnIndex);
@@ -44,6 +52,10 @@ public class DbToDbPipeline {
                 destination.setObject(columnIndex, value, columnType);
             }
         }
+    }
+
+    private boolean isOracle(ResultSet resultSet) {
+        return resultSet instanceof OracleResultSet;
     }
 
     private boolean isString(int columnType) {
