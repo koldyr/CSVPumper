@@ -51,7 +51,7 @@ public class ImportProcessor extends BatchDBProcessor {
         final String fileName = context.getPath() + '/' + tableName + ".csv";
         try (FileToDBPipeline dataPipeline = new FileToDBPipeline(fileName)) {
             connection = context.get(PoolType.DESTINATION);
-            connection.setSchema(context.getSchema());
+            connection.setSchema(context.getDstSchema());
 
             long rowCount = getRowCount(fileName);
 
@@ -90,7 +90,7 @@ public class ImportProcessor extends BatchDBProcessor {
         context.setPages(tableName, pages);
 
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
-        final String insertSql = createInsertSql(context.getSchema(), tableName, metaData.getColumnCount());
+        final String insertSql = createInsertSql(context.getDstSchema(), tableName, metaData.getColumnCount());
 
         final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
@@ -106,7 +106,7 @@ public class ImportProcessor extends BatchDBProcessor {
         final double step = context.getPageSize() / 100.0;
 
         ResultSetMetaData metaData = getMetaData(connection, tableName);
-        String sql = createInsertSql(context.getSchema(), tableName, metaData.getColumnCount());
+        String sql = createInsertSql(context.getDstSchema(), tableName, metaData.getColumnCount());
         PreparedStatement statement = connection.prepareStatement(sql);
 
         while (dataPipeline.next(statement, metaData)) {
@@ -124,7 +124,7 @@ public class ImportProcessor extends BatchDBProcessor {
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSchema() + "\".\"" + tableName + '"');
+            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getDstSchema() + "\".\"" + tableName + '"');
             return resultSet.getMetaData();
         } finally {
             if (resultSet != null) {

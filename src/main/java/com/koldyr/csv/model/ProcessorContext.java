@@ -26,7 +26,8 @@ public class ProcessorContext {
 
     private final KeyedObjectPool<PoolType, Connection> connectionsPool;
     private final List<String> tableNames;
-    private String schema;
+    private String srcSchema;
+    private String dstSchema;
     private String path;
 
     private ExecutorService executor;
@@ -38,12 +39,20 @@ public class ProcessorContext {
         this.tableNames = tableNames;
     }
 
-    public String getSchema() {
-        return schema;
+    public String getSrcSchema() {
+        return srcSchema;
     }
 
-    public void setSchema(String schema) {
-        this.schema = schema;
+    public void setSrcSchema(String srcSchema) {
+        this.srcSchema = srcSchema;
+    }
+
+    public String getDstSchema() {
+        return dstSchema;
+    }
+
+    public void setDstSchema(String dstSchema) {
+        this.dstSchema = dstSchema;
     }
 
     public String getPath() {
