@@ -10,17 +10,23 @@ package com.koldyr.csv.model;
  */
 public class ConnectionData {
     private final String url;
+    private final String schema;
     private final String user;
     private final String password;
 
-    public ConnectionData(String url, String user, String password) {
+    public ConnectionData(String url, String schema, String user, String password) {
         this.url = url;
+        this.schema = schema;
         this.user = user;
         this.password = password;
     }
 
     public String getUrl() {
         return url;
+    }
+
+    public String getSchema() {
+        return schema;
     }
 
     public String getUser() {

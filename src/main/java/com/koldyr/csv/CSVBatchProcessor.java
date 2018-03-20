@@ -49,7 +49,6 @@ public class CSVBatchProcessor {
         final Operation operation = Operation.valueOf(params.getProperty("operation"));
         final ConnectionData srcConfig = getDBConfig(params, "source");
         final ConnectionData dstConfig = getDBConfig(params, "destination");
-        final String schema = params.getProperty("schema");
         final String path = params.getProperty("path");
 
         LOGGER.debug("Load table names...");
@@ -67,7 +66,8 @@ public class CSVBatchProcessor {
 
             ProcessorContext context = new ProcessorContext(connectionsPool, tableNames);
             context.setPath(path);
-            context.setSchema(schema);
+            context.setSrcSchema(srcConfig.getSchema());
+            context.setDstSchema(dstConfig.getSchema());
             context.setExecutor(executor);
             context.setPageSize(Constants.PAGE_SIZE);
 
@@ -88,6 +88,7 @@ public class CSVBatchProcessor {
 
     private static ConnectionData getDBConfig(Properties params, String prefix) {
         return new ConnectionData(params.getProperty(prefix + ".url"),
+                params.getProperty(prefix + ".schema"),
                 params.getProperty(prefix + ".user"),
                 params.getProperty(prefix + ".password"));
     }

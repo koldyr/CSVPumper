@@ -97,7 +97,7 @@ public class CopyProcessor extends BatchDBProcessor {
             context.release(PoolType.SOURCE, connection);
         }
 
-        final String sqlInsert = createInsertSql(context.getSchema(), tableName, columnCount);
+        final String sqlInsert = createInsertSql(context.getDstSchema(), tableName, columnCount);
 
         int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> copyThreads = new ArrayList<>(threadCount);
@@ -114,11 +114,11 @@ public class CopyProcessor extends BatchDBProcessor {
         final double step = context.getPageSize() / 100.0;
 
         int columnCount = getColumnCount(srcConnection, tableName);
-        String insertSql = createInsertSql(context.getSchema(), tableName, columnCount);
+        String insertSql = createInsertSql(context.getDstSchema(), tableName, columnCount);
         ResultSet resultSet = null;
         try (Statement srcStatement = srcConnection.createStatement();
              PreparedStatement dstStatement = dstConnection.prepareStatement(insertSql)) {
-            resultSet = srcStatement.executeQuery("SELECT * FROM " + context.getSchema() + '.' + tableName);
+            resultSet = srcStatement.executeQuery("SELECT * FROM " + context.getDstSchema() + '.' + tableName);
 
             int counter = 0;
             while (dataPipeline.next(resultSet, dstStatement)) {
@@ -141,7 +141,7 @@ public class CopyProcessor extends BatchDBProcessor {
     private int getColumnCount(Connection connection, String tableName) throws SQLException {
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSchema() + "\".\"" + tableName + '"');
+            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSrcSchema() + "\".\"" + tableName + '"');
             return resultSet.getMetaData().getColumnCount();
         } finally {
             if (resultSet != null) {

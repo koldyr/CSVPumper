@@ -66,22 +66,22 @@ public abstract class BasePageProcessor implements Callable<Integer> {
     protected String getPageSQL(Connection connection, PageBlockData pageBlock) {
         boolean oracle = isOracle(connection);
         if (oracle) {
-            return "SELECT * FROM (SELECT subQ.*, rownum RNUM FROM ( SELECT * FROM " + context.getSchema() + '.' + tableName +
+            return "SELECT * FROM (SELECT subQ.*, rownum RNUM FROM ( SELECT * FROM " + context.getSrcSchema() + '.' + tableName +
                     " ORDER BY 1) subQ WHERE rownum <= " + (pageBlock.start + pageBlock.length) + " ORDER BY 1) WHERE RNUM > " + pageBlock.start + " ORDER BY 1";
         }
 
         boolean msSQLServer = isMsSQLServer(connection);
         if (msSQLServer) {
-            return "SELECT * FROM " + context.getSchema() + '.' + tableName + " ORDER BY 1 OFFSET " + pageBlock.start + " ROWS FETCH NEXT " + pageBlock.length + " ROWS ONLY";
+            return "SELECT * FROM " + context.getSrcSchema() + '.' + tableName + " ORDER BY 1 OFFSET " + pageBlock.start + " ROWS FETCH NEXT " + pageBlock.length + " ROWS ONLY";
         }
 
         boolean mySQL = isMySql(connection);
         boolean postgreSQL = isPostgreSQL(connection);
         if (postgreSQL || mySQL) {
-            return "SELECT * FROM " + context.getSchema() + '.' + tableName + " ORDER BY 1 LIMIT " + pageBlock.length + " OFFSET " + pageBlock.start;
+            return "SELECT * FROM " + context.getSrcSchema() + '.' + tableName + " ORDER BY 1 LIMIT " + pageBlock.length + " OFFSET " + pageBlock.start;
         }
 
-        return "SELECT * FROM " + context.getSchema() + '.' + tableName;
+        return "SELECT * FROM " + context.getSrcSchema() + '.' + tableName;
     }
 
     private boolean isPostgreSQL(Connection connection) {
