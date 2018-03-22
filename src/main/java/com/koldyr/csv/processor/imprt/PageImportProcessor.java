@@ -60,7 +60,6 @@ public class PageImportProcessor extends BasePageProcessor {
             connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
-            statement.setFetchSize(FETCH_SIZE);
 
             int counter = 0;
             while (dataPipeline.next(statement, metaData)) {
