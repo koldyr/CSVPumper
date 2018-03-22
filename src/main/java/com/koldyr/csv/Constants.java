@@ -13,4 +13,9 @@ public class Constants {
     public static long PAGE_SIZE = 100_000;
     public static int PARALLEL_TABLES = 5;
     public static int PARALLEL_PAGES = 40;
+
+    /**
+     * Oracle fetch size is 10 by default which is a performance killer for large result sets.
+     */
+    public static int FETCH_SIZE = 50000;
 }

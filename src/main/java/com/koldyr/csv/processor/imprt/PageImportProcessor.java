@@ -19,6 +19,8 @@ import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
 import com.koldyr.csv.processor.CallWithRetry;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
 /**
  * Description of class PageImportProcessor
  *
@@ -58,6 +60,7 @@ public class PageImportProcessor extends BasePageProcessor {
             connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
+            statement.setFetchSize(FETCH_SIZE);
 
             int counter = 0;
             while (dataPipeline.next(statement, metaData)) {
