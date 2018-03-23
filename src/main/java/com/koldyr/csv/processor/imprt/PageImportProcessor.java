@@ -19,6 +19,8 @@ import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
 import com.koldyr.csv.processor.CallWithRetry;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
 /**
  * Description of class PageImportProcessor
  *
