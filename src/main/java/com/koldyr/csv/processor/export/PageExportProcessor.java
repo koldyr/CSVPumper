@@ -17,6 +17,8 @@ import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
 import com.koldyr.csv.processor.CallWithRetry;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
 /**
  * Description of class PageExportProcessor
  *
@@ -48,6 +50,7 @@ public class PageExportProcessor extends BasePageProcessor {
             final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
+            statement.setFetchSize(FETCH_SIZE);
 
             String sql = getPageSQL(connection, pageBlock);
 
