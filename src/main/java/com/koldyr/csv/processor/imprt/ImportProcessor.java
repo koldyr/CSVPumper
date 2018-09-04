@@ -9,7 +9,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -99,7 +98,7 @@ public class ImportProcessor extends BatchDBProcessor {
 
         final List<Future<Integer>> results = context.getExecutor().invokeAll(importThreads);
 
-        checkResults(tableName, pageCount, results);
+        checkResults(tableName, threadCount, results);
     }
 
     private void singleImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws SQLException, IOException {
@@ -121,15 +120,16 @@ public class ImportProcessor extends BatchDBProcessor {
         statement.executeBatch();
     }
 
+    /**
+     * Intentionally left resources opened. Not all drivers allow to work with ResultSetMetaData after statement closed.
+     * @param connection
+     * @param tableName
+     * @return
+     * @throws SQLException
+     */
+    @SuppressWarnings({"JDBCResourceOpenedButNotSafelyClosed", "resource"})
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {
-        ResultSet resultSet = null;
-        try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getDstSchema() + "\".\"" + tableName + '"');
-            return resultSet.getMetaData();
-        } finally {
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        }
+        ResultSet resultSet = connection.createStatement().executeQuery("SELECT * FROM \"" + context.getDstSchema() + "\".\"" + tableName + '"');
+        return resultSet.getMetaData();
     }
 }
