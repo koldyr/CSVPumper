@@ -2,9 +2,12 @@ package com.koldyr.csv.io;
 
 import java.io.BufferedWriter;
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -14,11 +17,16 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.format.DateTimeFormatter;
 import java.util.StringJoiner;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * Description of class DataTransfer
@@ -27,13 +35,21 @@ import org.apache.commons.lang.StringUtils;
  */
 public class DBToFilePipeline implements Closeable {
 
+    public static final String BLOB_FILE_EXT = ".bin";
+
     private static final Pattern CARRIAGE_RETURN = Pattern.compile("[\n\r]+");
     private static final String CR_REPLACEMENT = "\\\\n";
 
     private final BufferedWriter output;
+    private final File blobDir;
 
     public DBToFilePipeline(String fileName) throws FileNotFoundException {
-        output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName, true)));
+        final File csvFile = new File(fileName);
+        csvFile.mkdirs();
+        output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFile, true), UTF_8));
+
+        final File dir = csvFile.getParentFile();
+        blobDir = new File(dir.getAbsolutePath() + '/' + stripExtension(csvFile) + '/');
     }
 
     public void flush() throws IOException {
@@ -98,8 +114,30 @@ public class DBToFilePipeline implements Closeable {
                 return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(timestamp.toLocalDateTime());
             case Types.NUMERIC:
                 return resultSet.getBigDecimal(columnIndex);
+            case Types.BLOB:
+            case Types.CLOB:
+            case Types.NCLOB:
+                return saveStream(resultSet, columnIndex);
             default:
                 return StringUtils.EMPTY;
         }
+    }
+
+    private String saveStream(ResultSet resultSet, int columnIndex) throws SQLException {
+        final String blobId = UUID.randomUUID().toString();
+        try (InputStream inputStream = resultSet.getBinaryStream(columnIndex);
+             OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
+            IOUtils.copy(inputStream, outputStream);
+            outputStream.flush();
+        } catch (IOException e) {
+            throw new SQLException(e);
+        }
+        return blobId;
+    }
+
+    public static String stripExtension(File csvFile) {
+        String name = csvFile.getName();
+        int dotIndex = name.lastIndexOf('.');
+        return name.substring(0, dotIndex);
     }
 }

@@ -18,6 +18,8 @@ import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import com.koldyr.csv.Constants;
 import com.koldyr.csv.io.FileToDBPipeline;
 import com.koldyr.csv.model.PageBlockData;
@@ -69,7 +71,7 @@ public class ImportProcessor extends BatchDBProcessor {
     }
 
     private long getRowCount(String fileName) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), UTF_8))) {
             return reader.lines().count();
         }
     }
@@ -111,6 +113,7 @@ public class ImportProcessor extends BatchDBProcessor {
         while (dataPipeline.next(statement, metaData)) {
             if (dataPipeline.counter() % step == 0) {
                 statement.executeBatch();
+                dataPipeline.closeBatch();
 
                 final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);
                 LOGGER.debug("\t{}%", percent);
@@ -118,6 +121,7 @@ public class ImportProcessor extends BatchDBProcessor {
         }
 
         statement.executeBatch();
+        dataPipeline.closeBatch();
     }
 
     /**

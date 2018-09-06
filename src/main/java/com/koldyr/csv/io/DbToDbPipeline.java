@@ -1,5 +1,6 @@
 package com.koldyr.csv.io;
 
+import java.io.InputStream;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -44,6 +45,9 @@ public class DbToDbPipeline {
             if (isString(columnType)) {
                 final String value = source.getString(columnIndex);
                 destination.setString(columnIndex, value);
+            } else if (isBlob(columnType)) {
+                final InputStream value = source.getBinaryStream(columnIndex);
+                destination.setBinaryStream(columnIndex, value);
             } else {
                 final Object value = source.getObject(columnIndex);
                 destination.setObject(columnIndex, value, columnType);
@@ -57,5 +61,9 @@ public class DbToDbPipeline {
 
     private boolean isString(int columnType) {
         return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
+    }
+
+    private boolean isBlob(int columnType) {
+        return columnType == Types.BLOB || columnType == Types.CLOB || columnType == Types.NCLOB || columnType == Types.LONGNVARCHAR;
     }
 }

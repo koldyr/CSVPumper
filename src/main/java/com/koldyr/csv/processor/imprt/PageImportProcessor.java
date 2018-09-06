@@ -63,6 +63,7 @@ public class PageImportProcessor extends BasePageProcessor {
                 if (counter % step == 0) {
                     final CallWithRetry<int[]> executeBatch = new CallWithRetry<>(statement::executeBatch, 3, 1000, false);
                     executeBatch.call();
+                    dataPipeline.closeBatch();
 
                     final long percent = Math.round(dataPipeline.counter() / totalRowCount * 100.0);
                     LOGGER.debug("\t{}%", percent);
@@ -70,6 +71,7 @@ public class PageImportProcessor extends BasePageProcessor {
             }
 
             statement.executeBatch();
+            dataPipeline.closeBatch();
 
             LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
         } finally {
