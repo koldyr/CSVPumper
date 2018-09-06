@@ -1,6 +1,3 @@
-/*
- * (c) 2012-2018 Swiss Re. All rights reserved.
- */
 package com.koldyr.csv.processor.copy;
 
 import java.sql.Connection;
