@@ -58,7 +58,7 @@ public class FileToDBPipeline implements Closeable {
     private final Collection<InputStream> blobStreams = new LinkedList<>();
 
     public FileToDBPipeline(String fileName) throws FileNotFoundException {
-        File csvFile = new File(fileName);
+        final File csvFile = new File(fileName);
 
         blobDir = new File(csvFile.getParentFile(), stripExtension(csvFile));
         reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), UTF_8));
