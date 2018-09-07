@@ -38,7 +38,7 @@ import static com.koldyr.csv.io.DBToFilePipeline.stripExtension;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * Description of class FileToDBPipeline
+ * Pipeline to load data from cvs file to database table
  *
  * @created: 2018.03.07
  */
