@@ -60,10 +60,8 @@ public class FileToDBPipeline implements Closeable {
     public FileToDBPipeline(String fileName) throws FileNotFoundException {
         File csvFile = new File(fileName);
 
-        File dir = csvFile.getParentFile();
-        blobDir = new File(dir.getAbsolutePath() + '/' + stripExtension(csvFile));
-
-        reader = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), UTF_8));
+        blobDir = new File(csvFile.getParentFile(), stripExtension(csvFile));
+        reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), UTF_8));
     }
 
     public long counter() {
@@ -191,9 +189,9 @@ public class FileToDBPipeline implements Closeable {
         }
     }
 
-    private void setBlob(PreparedStatement statement, int columnIndex, String blobFile) throws SQLException {
+    private void setBlob(PreparedStatement statement, int columnIndex, String blobId) throws SQLException {
         try {
-            final InputStream inputStream = new FileInputStream(new File(blobDir, blobFile + BLOB_FILE_EXT));
+            final InputStream inputStream = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
             blobStreams.add(inputStream);
             statement.setBinaryStream(columnIndex, inputStream);
         } catch (FileNotFoundException e) {

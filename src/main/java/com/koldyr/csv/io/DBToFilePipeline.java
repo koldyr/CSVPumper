@@ -41,15 +41,17 @@ public class DBToFilePipeline implements Closeable {
     private static final String CR_REPLACEMENT = "\\\\n";
 
     private final BufferedWriter output;
-    private final File blobDir;
+
+    private File blobDir;
+    private final File csvFile;
 
     public DBToFilePipeline(String fileName) throws FileNotFoundException {
-        final File csvFile = new File(fileName);
-        csvFile.mkdirs();
-        output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFile, true), UTF_8));
-
+        csvFile = new File(fileName);
         final File dir = csvFile.getParentFile();
-        blobDir = new File(dir.getAbsolutePath() + '/' + stripExtension(csvFile) + '/');
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFile, true), UTF_8));
     }
 
     public void flush() throws IOException {
@@ -124,6 +126,10 @@ public class DBToFilePipeline implements Closeable {
     }
 
     private String saveStream(ResultSet resultSet, int columnIndex) throws SQLException {
+        if (blobDir == null) {
+            createBlobSubFolder();
+        }
+
         final String blobId = UUID.randomUUID().toString();
         try (InputStream inputStream = resultSet.getBinaryStream(columnIndex);
              OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
@@ -133,6 +139,13 @@ public class DBToFilePipeline implements Closeable {
             throw new SQLException(e);
         }
         return blobId;
+    }
+
+    private void createBlobSubFolder() {
+        blobDir = new File(csvFile.getParentFile(), stripExtension(csvFile));
+        if (!blobDir.exists()) {
+            blobDir.mkdirs();
+        }
     }
 
     public static String stripExtension(File csvFile) {
