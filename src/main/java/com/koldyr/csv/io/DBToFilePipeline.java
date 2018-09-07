@@ -148,7 +148,7 @@ public class DBToFilePipeline implements Closeable {
         }
     }
 
-    public static String stripExtension(File csvFile) {
+    static String stripExtension(File csvFile) {
         String name = csvFile.getName();
         int dotIndex = name.lastIndexOf('.');
         return name.substring(0, dotIndex);
