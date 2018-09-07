@@ -29,7 +29,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Description of class DataTransfer
+ * Pipeline to load data from db table into csv file. Dlob/clob columns will be stored in dedicated sub-folder
  *
  * @created: 2018.03.05
  */
