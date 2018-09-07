@@ -10,7 +10,7 @@ import java.sql.Types;
 import oracle.jdbc.OracleResultSet;
 
 /**
- * Description of class DbToDBPipeline
+ * Pipeline to load data from one table to directly another database , w/o intermediate file
  *
  * @created: 2018.03.18
  */
