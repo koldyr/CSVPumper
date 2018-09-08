@@ -7,16 +7,12 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.concurrent.Callable;
 
-import org.postgresql.core.BaseConnection;
 import org.slf4j.LoggerFactory;
 
-import oracle.jdbc.OracleConnection;
+import static com.koldyr.csv.db.DatabaseDetector.*;
 
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.ProcessorContext;
-import com.mysql.cj.api.jdbc.JdbcConnection;
-
-import com.microsoft.sqlserver.jdbc.ISQLServerConnection;
 
 /**
  * Description of class BasePageProcessor
@@ -80,21 +76,4 @@ public abstract class BasePageProcessor implements Callable<Integer> {
 
         return "SELECT * FROM " + context.getSrcSchema() + '.' + tableName;
     }
-
-    private boolean isPostgreSQL(Connection connection) {
-        return connection instanceof BaseConnection;
-    }
-
-    private boolean isMySql(Connection connection) {
-        return connection instanceof JdbcConnection;
-    }
-
-    private boolean isMsSQLServer(Connection connection) {
-        return connection instanceof ISQLServerConnection;
-    }
-
-    private boolean isOracle(Connection connection) {
-        return connection instanceof OracleConnection;
-    }
-
 }

@@ -3,11 +3,12 @@ package com.koldyr.csv.io;
 import java.io.BufferedReader;
 import java.io.CharArrayWriter;
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.CharBuffer;
 import java.sql.Date;
@@ -20,6 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -30,8 +33,12 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 
+import static com.koldyr.csv.io.DBToFilePipeline.BLOB_FILE_EXT;
+import static com.koldyr.csv.io.DBToFilePipeline.stripExtension;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
- * Description of class FileToDBPipeline
+ * Pipeline to load data from cvs file to database table
  *
  * @created: 2018.03.07
  */
@@ -46,8 +53,15 @@ public class FileToDBPipeline implements Closeable {
 
     private final AtomicLong counter = new AtomicLong();
 
-    public FileToDBPipeline(String fileName) throws FileNotFoundException, UnsupportedEncodingException {
-        reader = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), "UTF-8"));
+    private final File blobDir;
+
+    private final Collection<InputStream> blobStreams = new LinkedList<>();
+
+    public FileToDBPipeline(String fileName) throws FileNotFoundException {
+        final File csvFile = new File(fileName);
+
+        blobDir = new File(csvFile.getParentFile(), stripExtension(csvFile));
+        reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), UTF_8));
     }
 
     public long counter() {
@@ -166,8 +180,35 @@ public class FileToDBPipeline implements Closeable {
             case Types.NUMERIC:
                 statement.setBigDecimal(columnIndex, new BigDecimal(v));
                 break;
+            case Types.BLOB:
+            case Types.CLOB:
+            case Types.NCLOB:
+                setBlob(statement, columnIndex, value, columnType);
+                break;
             default:
                 statement.setObject(columnIndex, v, columnType);
+        }
+    }
+
+    private void setBlob(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
+        try {
+            final InputStream inputStream = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
+            blobStreams.add(inputStream);
+
+            switch (columnType) {
+                case Types.BLOB:
+                    statement.setBlob(columnIndex, inputStream);
+                    break;
+                case Types.CLOB:
+                    statement.setClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
+                    break;
+                case Types.NCLOB:
+                    statement.setNClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
+                    break;
+                default:
+            }
+        } catch (FileNotFoundException e) {
+            throw new SQLException(e);
         }
     }
 
@@ -178,5 +219,16 @@ public class FileToDBPipeline implements Closeable {
     @Override
     public void close() throws IOException {
         reader.close();
+    }
+
+    public void closeBatch() {
+        blobStreams.forEach(inputStream -> {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        blobStreams.clear();
     }
 }
