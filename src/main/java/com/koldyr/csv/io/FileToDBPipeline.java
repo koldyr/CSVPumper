@@ -183,17 +183,30 @@ public class FileToDBPipeline implements Closeable {
             case Types.BLOB:
             case Types.CLOB:
             case Types.NCLOB:
-                setBlob(statement, columnIndex, value);
+                setBlob(statement, columnIndex, value, columnType);
+                break;
             default:
                 statement.setObject(columnIndex, v, columnType);
         }
     }
 
-    private void setBlob(PreparedStatement statement, int columnIndex, String blobId) throws SQLException {
+    private void setBlob(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
         try {
             final InputStream inputStream = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
             blobStreams.add(inputStream);
-            statement.setBinaryStream(columnIndex, inputStream);
+
+            switch (columnType) {
+                case Types.BLOB:
+                    statement.setBlob(columnIndex, inputStream);
+                    break;
+                case Types.CLOB:
+                    statement.setClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
+                    break;
+                case Types.NCLOB:
+                    statement.setNClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
+                    break;
+                default:
+            }
         } catch (FileNotFoundException e) {
             throw new SQLException(e);
         }

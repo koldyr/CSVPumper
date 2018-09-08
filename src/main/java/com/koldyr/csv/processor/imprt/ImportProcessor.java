@@ -18,6 +18,7 @@ import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.koldyr.csv.db.DatabaseDetector.isOracle;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.koldyr.csv.Constants;
@@ -52,7 +53,9 @@ public class ImportProcessor extends BatchDBProcessor {
         final String fileName = context.getPath() + '/' + tableName + ".csv";
         try (FileToDBPipeline dataPipeline = new FileToDBPipeline(fileName)) {
             connection = context.get(PoolType.DESTINATION);
-            connection.setSchema(context.getDstSchema());
+            if (!isOracle(connection)) {
+                connection.setSchema(context.getDstSchema());
+            }
 
             long rowCount = getRowCount(fileName);
 
