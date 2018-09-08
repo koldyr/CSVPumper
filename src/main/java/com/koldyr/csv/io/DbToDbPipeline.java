@@ -6,8 +6,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 
-import oracle.jdbc.OracleResultSet;
-
 /**
  * Description of class DbToDBPipeline
  *
@@ -35,7 +33,7 @@ public class DbToDbPipeline {
         ResultSetMetaData metaData = source.getMetaData();
         int columnCount = metaData.getColumnCount();
 
-        if (isOracle(source)) {
+        if (hasNonDataColumns(source)) {
             columnCount--;
         }
 
@@ -51,8 +49,12 @@ public class DbToDbPipeline {
         }
     }
 
-    private boolean isOracle(ResultSet resultSet) {
-        return resultSet instanceof OracleResultSet;
+    private boolean hasNonDataColumns(ResultSet resultSet) {
+        try {
+            return resultSet.findColumn("RNUM") > -1;
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     private boolean isString(int columnType) {
