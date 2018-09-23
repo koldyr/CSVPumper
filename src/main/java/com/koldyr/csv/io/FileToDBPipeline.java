@@ -138,7 +138,7 @@ public class FileToDBPipeline implements Closeable {
             }
 
             final String columnTypeName = metaData.getColumnTypeName(columnIndex);
-            if (columnTypeName.equals("text")) { // special case for Postgre TEXT
+            if (columnTypeName.equals("text")) { // special case for Postgre TEXT type
                 columnType = Oid.TEXT;
             }
         } else {
