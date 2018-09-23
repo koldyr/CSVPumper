@@ -119,6 +119,7 @@ public class DBToFilePipeline implements Closeable {
             case Types.BLOB:
             case Types.CLOB:
             case Types.NCLOB:
+            case Types.BINARY:
                 return saveStream(resultSet, columnIndex);
             default:
                 return StringUtils.EMPTY;

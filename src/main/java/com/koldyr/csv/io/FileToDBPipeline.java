@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+import org.postgresql.core.Oid;
 
 import static com.koldyr.csv.io.DBToFilePipeline.BLOB_FILE_EXT;
 import static com.koldyr.csv.io.DBToFilePipeline.stripExtension;
@@ -128,12 +129,17 @@ public class FileToDBPipeline implements Closeable {
     }
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
-        final int columnType = metaData.getColumnType(columnIndex);
+        int columnType = metaData.getColumnType(columnIndex);
 
         if (isString(columnType)) {
             if (value == null) {
                 statement.setNull(columnIndex, columnType);
                 return;
+            }
+
+            final String columnTypeName = metaData.getColumnTypeName(columnIndex);
+            if (columnTypeName.equals("text")) { // special case for Postgre TEXT
+                columnType = Oid.TEXT;
             }
         } else {
             if (StringUtils.isEmpty(value)) {
@@ -183,6 +189,8 @@ public class FileToDBPipeline implements Closeable {
             case Types.BLOB:
             case Types.CLOB:
             case Types.NCLOB:
+            case Types.BINARY:
+            case Oid.TEXT:
                 setBlob(statement, columnIndex, value, columnType);
                 break;
             default:
@@ -204,6 +212,12 @@ public class FileToDBPipeline implements Closeable {
                     break;
                 case Types.NCLOB:
                     statement.setNClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
+                    break;
+                case Types.BINARY:
+                    statement.setBinaryStream(columnIndex, inputStream);
+                    break;
+                case Oid.TEXT:
+                    statement.setCharacterStream(columnIndex, new InputStreamReader(inputStream, UTF_8));
                     break;
                 default:
             }
