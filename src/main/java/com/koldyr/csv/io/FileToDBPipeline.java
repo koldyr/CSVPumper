@@ -43,7 +43,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  *
  * @created: 2018.03.07
  */
-public class FileToDBPipeline implements Closeable {
+public class FileToDBPipeline extends BaseDBPipeline implements Closeable {
 
     private static final Pattern CARRIAGE_RETURN = Pattern.compile("\\\\n");
     private static final String CR_REPLACEMENT = "\n";
@@ -191,43 +191,22 @@ public class FileToDBPipeline implements Closeable {
             case Types.NCLOB:
             case Types.BINARY:
             case Oid.TEXT:
-                setBlob(statement, columnIndex, value, columnType);
+                setLOB(statement, columnIndex, value, columnType);
                 break;
             default:
                 statement.setObject(columnIndex, v, columnType);
         }
     }
 
-    private void setBlob(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
+    private void setLOB(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
         try {
-            final InputStream inputStream = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
-            blobStreams.add(inputStream);
+            final InputStream lob = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
+            blobStreams.add(lob);
 
-            switch (columnType) {
-                case Types.BLOB:
-                    statement.setBlob(columnIndex, inputStream);
-                    break;
-                case Types.CLOB:
-                    statement.setClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
-                    break;
-                case Types.NCLOB:
-                    statement.setNClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
-                    break;
-                case Types.BINARY:
-                    statement.setBinaryStream(columnIndex, inputStream);
-                    break;
-                case Oid.TEXT:
-                    statement.setCharacterStream(columnIndex, new InputStreamReader(inputStream, UTF_8));
-                    break;
-                default:
-            }
+            setLOB(statement, columnIndex, columnType, lob);
         } catch (FileNotFoundException e) {
             throw new SQLException(e);
         }
-    }
-
-    private boolean isString(int columnType) {
-        return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
     }
 
     @Override
