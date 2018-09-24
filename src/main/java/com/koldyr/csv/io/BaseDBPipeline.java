@@ -6,6 +6,7 @@ package com.koldyr.csv.io;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.PreparedStatement;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 
@@ -49,4 +50,15 @@ public class BaseDBPipeline {
         }
     }
 
+    protected int getColumnType(ResultSetMetaData metaData, int columnIndex) throws SQLException {
+        int columnType = metaData.getColumnType(columnIndex);
+
+        if (isString(columnType)) {
+            final String columnTypeName = metaData.getColumnTypeName(columnIndex);
+            if (columnTypeName.equals("text")) { // special case for Postgres TEXT type
+                columnType = Oid.TEXT;
+            }
+        }
+        return columnType;
+    }
 }

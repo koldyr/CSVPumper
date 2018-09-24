@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.sql.Date;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -24,6 +23,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+import org.postgresql.core.Oid;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -33,7 +33,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  *
  * @created: 2018.03.05
  */
-public class DBToFilePipeline implements Closeable {
+public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
 
     public static final String BLOB_FILE_EXT = ".bin";
 
@@ -84,8 +84,7 @@ public class DBToFilePipeline implements Closeable {
     }
 
     private Object getValue(ResultSet resultSet, int columnIndex) throws SQLException {
-        final ResultSetMetaData metaData = resultSet.getMetaData();
-        final int columnType = metaData.getColumnType(columnIndex);
+        int columnType = getColumnType(resultSet.getMetaData(), columnIndex);
 
         switch (columnType) {
             case Types.VARCHAR:
@@ -120,6 +119,7 @@ public class DBToFilePipeline implements Closeable {
             case Types.CLOB:
             case Types.NCLOB:
             case Types.BINARY:
+            case Oid.TEXT:
                 return saveStream(resultSet, columnIndex);
             default:
                 return StringUtils.EMPTY;

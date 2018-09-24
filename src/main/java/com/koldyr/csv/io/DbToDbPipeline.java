@@ -6,8 +6,6 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
-import org.postgresql.core.Oid;
-
 /**
  * Pipeline to load data from one table to directly another database , w/o intermediate file
  *
@@ -40,18 +38,9 @@ public class DbToDbPipeline extends BaseDBPipeline {
         }
 
         for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-            int columnType = srcMetaData.getColumnType(columnIndex);
-            boolean isStringType = isString(columnType);
+            final int columnType = getColumnType(srcMetaData, columnIndex);
 
-            if (isStringType) {
-                final String columnTypeName = srcMetaData.getColumnTypeName(columnIndex);
-                if (columnTypeName.equals("text")) {
-                    columnType = Oid.TEXT;
-                    isStringType = false;
-                }
-            }
-
-            if (isStringType) {
+            if (isString(columnType)) {
                 final String value = source.getString(columnIndex);
                 destination.setString(columnIndex, value);
             } else if (isLOB(columnType)) {

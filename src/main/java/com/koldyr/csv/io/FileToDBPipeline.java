@@ -129,17 +129,12 @@ public class FileToDBPipeline extends BaseDBPipeline implements Closeable {
     }
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
-        int columnType = metaData.getColumnType(columnIndex);
+        int columnType = getColumnType(metaData, columnIndex);
 
         if (isString(columnType)) {
             if (value == null) {
                 statement.setNull(columnIndex, columnType);
                 return;
-            }
-
-            final String columnTypeName = metaData.getColumnTypeName(columnIndex);
-            if (columnTypeName.equals("text")) { // special case for Postgre TEXT type
-                columnType = Oid.TEXT;
             }
         } else {
             if (StringUtils.isEmpty(value)) {

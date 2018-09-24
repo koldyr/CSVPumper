@@ -71,7 +71,7 @@ public class ExportProcessor extends BatchDBProcessor {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM " + context.getSrcSchema() + '.' + tableName);
+            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSrcSchema() + "\".\"" + tableName + "\"");
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
             final int columnCount = metaData.getColumnCount();
