@@ -9,6 +9,7 @@ import java.sql.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DbToDbPipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
@@ -54,7 +55,7 @@ public class PageCopyProcessor extends BasePageProcessor {
             srcConnection = getSrcConnection.call();
             srcStatement = srcConnection.createStatement();
 
-            String sqlGetPage = getPageSQL(srcConnection, pageBlock);
+            String sqlGetPage = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.getSrcSchema(), tableName);
 
             srcResultSet = srcStatement.executeQuery(sqlGetPage);
 

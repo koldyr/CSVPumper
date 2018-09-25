@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.koldyr.csv.Constants;
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
@@ -71,7 +72,8 @@ public class ExportProcessor extends BatchDBProcessor {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSrcSchema() + "\".\"" + tableName + "\"");
+            final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getSrcSchema(), tableName);
+            resultSet = statement.executeQuery(selectAll);
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
             final int columnCount = metaData.getColumnCount();

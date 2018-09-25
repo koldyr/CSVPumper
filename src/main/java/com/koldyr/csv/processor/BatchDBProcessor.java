@@ -7,12 +7,12 @@ import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Collection;
-import java.util.StringJoiner;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 import org.slf4j.LoggerFactory;
 
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 
@@ -68,7 +68,8 @@ public abstract class BatchDBProcessor implements Callable<Object> {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT count(1) FROM \"" + context.getSrcSchema() + "\".\"" + tableName + "\"");
+            final String getRowCount = SQLStatementFactory.getRowCount(connection, context.getDstSchema(), tableName);
+            resultSet = statement.executeQuery(getRowCount);
 
             if (resultSet.next()) {
                 rowCount = resultSet.getLong(1);
@@ -89,14 +90,5 @@ public abstract class BatchDBProcessor implements Callable<Object> {
                 LoggerFactory.getLogger(getClass()).error(e.getMessage(), e);
             }
         }
-    }
-
-    protected String createInsertSql(String schema, String tableName, int columnCount) {
-        StringJoiner values = new StringJoiner(",");
-        for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-            values.add("?");
-        }
-
-        return "INSERT INTO \"" + schema + "\".\"" + tableName + "\" VALUES (" + values + ')';
     }
 }

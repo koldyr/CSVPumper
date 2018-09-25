@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.koldyr.csv.Constants;
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DbToDbPipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
@@ -94,7 +95,7 @@ public class CopyProcessor extends BatchDBProcessor {
             context.release(PoolType.SOURCE, connection);
         }
 
-        final String sqlInsert = createInsertSql(context.getDstSchema(), tableName, columnCount);
+        final String sqlInsert = SQLStatementFactory.getInsertValues(connection, context.getDstSchema(), tableName, columnCount);
 
         int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> copyThreads = new ArrayList<>(threadCount);
@@ -110,12 +111,13 @@ public class CopyProcessor extends BatchDBProcessor {
     private void copy(Connection srcConnection, Connection dstConnection, DbToDbPipeline dataPipeline, String tableName, long rowCount) throws SQLException {
         final double step = context.getPageSize() / 100.0;
 
-        int columnCount = getColumnCount(srcConnection, tableName);
-        String insertSql = createInsertSql(context.getDstSchema(), tableName, columnCount);
+        final int columnCount = getColumnCount(srcConnection, tableName);
+        final String insertSql = SQLStatementFactory.getInsertValues(dstConnection, context.getDstSchema(), tableName, columnCount);
         ResultSet resultSet = null;
         try (Statement srcStatement = srcConnection.createStatement();
              PreparedStatement dstStatement = dstConnection.prepareStatement(insertSql)) {
-            resultSet = srcStatement.executeQuery("SELECT * FROM " + context.getDstSchema() + '.' + tableName);
+            final String selectAll = SQLStatementFactory.getSelectAll(dstConnection, context.getDstSchema(), tableName);
+            resultSet = srcStatement.executeQuery(selectAll);
 
             int counter = 0;
             while (dataPipeline.next(resultSet, dstStatement)) {
@@ -138,7 +140,8 @@ public class CopyProcessor extends BatchDBProcessor {
     private int getColumnCount(Connection connection, String tableName) throws SQLException {
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM \"" + context.getSrcSchema() + "\".\"" + tableName + '"');
+            final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getSrcSchema(), tableName);
+            resultSet = statement.executeQuery(selectAll);
             return resultSet.getMetaData().getColumnCount();
         } finally {
             if (resultSet != null) {

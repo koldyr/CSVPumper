@@ -10,14 +10,15 @@ import java.sql.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
 import com.koldyr.csv.processor.CallWithRetry;
-
-import static com.koldyr.csv.Constants.FETCH_SIZE;
 
 /**
  * Description of class PageExportProcessor
@@ -52,7 +53,7 @@ public class PageExportProcessor extends BasePageProcessor {
             statement = connection.createStatement();
             statement.setFetchSize(FETCH_SIZE);
 
-            String sql = getPageSQL(connection, pageBlock);
+            final String sql = SQLStatementFactory.getPageSQL(connection, pageBlock, context.getSrcSchema(), tableName);
 
             resultSet = statement.executeQuery(sql);
 
