@@ -54,14 +54,9 @@ public class PageExportProcessor extends BasePageProcessor {
             statement.setFetchSize(FETCH_SIZE);
 
             final String sql = SQLStatementFactory.getPageSQL(connection, pageBlock, context.getSrcSchema(), tableName);
-
             resultSet = statement.executeQuery(sql);
 
-            final ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            if (sql.contains("RNUM")) {// remove ROWNUM column
-                columnCount--;
-            }
+            final int columnCount = getColumnCount(resultSet, sql);
 
             int counter = 0;
             while (dataPipeline.next(resultSet, columnCount)) {
@@ -92,5 +87,14 @@ public class PageExportProcessor extends BasePageProcessor {
                 LOGGER.error(e.getMessage(), e);
             }
         }
+    }
+
+    private int getColumnCount(ResultSet resultSet, String sql) throws SQLException {
+        final ResultSetMetaData metaData = resultSet.getMetaData();
+        int columnCount = metaData.getColumnCount();
+        if (sql.contains("RNUM")) {// remove ROWNUM column
+            columnCount--;
+        }
+        return columnCount;
     }
 }

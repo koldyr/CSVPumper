@@ -21,7 +21,7 @@ import com.koldyr.csv.db.DatabaseDetector;
  *
  * @created: 2018.09.24
  */
-public class BaseDBPipeline {
+public abstract class BaseDBPipeline {
     protected boolean isString(int columnType) {
         return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
     }

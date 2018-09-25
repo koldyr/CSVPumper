@@ -9,6 +9,8 @@ import java.sql.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
 import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DbToDbPipeline;
 import com.koldyr.csv.model.PageBlockData;
@@ -54,10 +56,10 @@ public class PageCopyProcessor extends BasePageProcessor {
             final CallWithRetry<Connection> getSrcConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             srcConnection = getSrcConnection.call();
             srcStatement = srcConnection.createStatement();
+            srcStatement.setFetchSize(FETCH_SIZE);
 
-            String sqlGetPage = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.getSrcSchema(), tableName);
-
-            srcResultSet = srcStatement.executeQuery(sqlGetPage);
+            final String sql = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.getSrcSchema(), tableName);
+            srcResultSet = srcStatement.executeQuery(sql);
 
             final CallWithRetry<Connection> getDstConnection = new CallWithRetry<>(() -> context.get(PoolType.DESTINATION), 30, 2000, true);
             dstConnection = getDstConnection.call();
