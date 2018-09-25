@@ -68,7 +68,7 @@ public abstract class BatchDBProcessor implements Callable<Object> {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            final String getRowCount = SQLStatementFactory.getRowCount(connection, context.getDstSchema(), tableName);
+            final String getRowCount = SQLStatementFactory.getRowCount(connection, context.getSrcSchema(), tableName);
             resultSet = statement.executeQuery(getRowCount);
 
             if (resultSet.next()) {
