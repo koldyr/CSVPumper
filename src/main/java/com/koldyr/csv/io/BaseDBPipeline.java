@@ -14,6 +14,8 @@ import org.postgresql.core.Oid;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.koldyr.csv.db.DatabaseDetector;
+
 /**
  * Description of class BaseDBPipeline
  *
@@ -32,15 +34,24 @@ public class BaseDBPipeline {
     protected void setLOB(PreparedStatement destination, int columnIndex, int columnType, InputStream lob) throws SQLException {
         switch (columnType) {
             case Types.BLOB:
-                destination.setBlob(columnIndex, lob);
+                if (DatabaseDetector.isBLOBSupported(destination)) {
+                    destination.setBlob(columnIndex, lob);
+                } else {
+                    destination.setBinaryStream(columnIndex, lob);
+                }
                 break;
             case Types.CLOB:
-                destination.setClob(columnIndex, new InputStreamReader(lob, UTF_8));
+                if (DatabaseDetector.isCLOBSupported(destination)) {
+                    destination.setClob(columnIndex, new InputStreamReader(lob, UTF_8));
+                } else {
+                    destination.setCharacterStream(columnIndex, new InputStreamReader(lob, UTF_8));
+                }
                 break;
             case Types.NCLOB:
                 destination.setNClob(columnIndex, new InputStreamReader(lob, UTF_8));
                 break;
             case Types.BINARY:
+            case Types.LONGVARBINARY:
                 destination.setBinaryStream(columnIndex, lob);
                 break;
             case Oid.TEXT:

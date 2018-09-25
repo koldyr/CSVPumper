@@ -116,7 +116,7 @@ public class CopyProcessor extends BatchDBProcessor {
         ResultSet resultSet = null;
         try (Statement srcStatement = srcConnection.createStatement();
              PreparedStatement dstStatement = dstConnection.prepareStatement(insertSql)) {
-            final String selectAll = SQLStatementFactory.getSelectAll(dstConnection, context.getDstSchema(), tableName);
+            final String selectAll = SQLStatementFactory.getSelectAll(srcConnection, context.getSrcSchema(), tableName);
             resultSet = srcStatement.executeQuery(selectAll);
 
             int counter = 0;

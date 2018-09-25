@@ -2,8 +2,10 @@ package com.koldyr.csv.db;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.Statement;
 
 import org.postgresql.core.BaseConnection;
+import org.postgresql.jdbc.PgStatement;
 
 import oracle.jdbc.OracleConnection;
 import oracle.jdbc.OracleResultSet;
@@ -37,5 +39,13 @@ public class DatabaseDetector {
 
     public static boolean isMsSQLServer(Connection connection) {
         return connection instanceof ISQLServerConnection;
+    }
+
+    public static boolean isCLOBSupported(Statement statement) {
+        return !(statement instanceof PgStatement);
+    }
+
+    public static boolean isBLOBSupported(Statement statement) {
+        return !(statement instanceof PgStatement);
     }
 }
