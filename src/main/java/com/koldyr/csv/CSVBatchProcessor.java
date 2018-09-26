@@ -6,6 +6,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -40,26 +42,26 @@ public class CSVBatchProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(CSVBatchProcessor.class);
 
     public static void main(String[] args) throws IOException {
-        Properties params = new Properties();
+        Properties dbConfig = new Properties();
 
-        try (FileInputStream inputStream = new FileInputStream("params.properties")) {
-            params.load(inputStream);
+        try (FileInputStream inputStream = new FileInputStream("db-config.properties")) {
+            dbConfig.load(inputStream);
         }
 
-        final Operation operation = Operation.valueOf(params.getProperty("operation"));
-        final ConnectionData srcConfig = getDBConfig(params, "source");
-        final ConnectionData dstConfig = getDBConfig(params, "destination");
-        final String path = params.getProperty("path");
+        final Operation operation = Operation.valueOf(dbConfig.getProperty("operation"));
+        final ConnectionData srcConfig = getDBConfig(dbConfig, "source");
+        final ConnectionData dstConfig = getDBConfig(dbConfig, "destination");
+        final String path = dbConfig.getProperty("path");
+
+        final KeyedObjectPool<PoolType, Connection> connectionsPool = createConnectionsPool(srcConfig, dstConfig);
 
         LOGGER.debug("Load table names...");
         final List<String> tableNames = loadTableNames();
 
-        loadConfig();
+        loadProcessConfig(connectionsPool);
 
         final int threadCount = Math.min(Constants.PARALLEL_TABLES, tableNames.size());
         final ExecutorService executor = Executors.newCachedThreadPool();
-
-        KeyedObjectPool<PoolType, Connection> connectionsPool = createConnectionsPool(srcConfig, dstConfig);
 
         try {
             LOGGER.debug("Create processors");
@@ -93,15 +95,57 @@ public class CSVBatchProcessor {
                 params.getProperty(prefix + ".password"));
     }
 
-    private static void loadConfig() {
+    private static void loadProcessConfig(KeyedObjectPool<PoolType, Connection> connectionsPool) {
         try {
             Properties config = new Properties();
-            config.load(new FileInputStream("config.properties"));
+            config.load(new FileInputStream("process-config.properties"));
             Constants.MAX_CONNECTIONS = Integer.parseInt(config.getProperty("max-connections"));
             Constants.PAGE_SIZE = Long.parseLong(config.getProperty("page-size"));
             Constants.PARALLEL_TABLES = Integer.parseInt(config.getProperty("parallel-tables"));
             Constants.PARALLEL_PAGES = Integer.parseInt(config.getProperty("parallel-pages"));
-        } catch (IOException e) {
+
+            Integer srcMaxConnections;
+            String srcQuoteString = null;
+
+            Connection connection = null;
+            try {
+                connection = connectionsPool.borrowObject(PoolType.SOURCE);
+                DatabaseMetaData databaseMetaData = connection.getMetaData();
+                srcMaxConnections = databaseMetaData.getMaxConnections();
+                if (srcMaxConnections == 0) {
+                    srcMaxConnections = Integer.MAX_VALUE;
+                }
+                srcQuoteString = databaseMetaData.getIdentifierQuoteString();
+            } catch (Exception e) {
+                srcMaxConnections = Integer.MAX_VALUE;
+            } finally {
+                if (connection != null) {
+                    connectionsPool.returnObject(PoolType.SOURCE, connection);
+                }
+            }
+
+            Integer dstMaxConnections;
+            String dstQuoteString = null;
+
+            try {
+                connection = connectionsPool.borrowObject(PoolType.DESTINATION);
+                DatabaseMetaData databaseMetaData = connection.getMetaData();
+                dstMaxConnections = databaseMetaData.getMaxConnections();
+                if (dstMaxConnections == 0) {
+                    dstMaxConnections = Integer.MAX_VALUE;
+                }
+                dstQuoteString = databaseMetaData.getIdentifierQuoteString();
+            } catch (Exception e) {
+                dstMaxConnections = Integer.MAX_VALUE;
+            } finally {
+                if (connection != null) {
+                    connectionsPool.returnObject(PoolType.DESTINATION, connection);
+                }
+            }
+
+            List<Integer> mxCons = Arrays.asList(Constants.MAX_CONNECTIONS, srcMaxConnections, dstMaxConnections);
+            Constants.MAX_CONNECTIONS = Collections.min(mxCons);
+        } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         }
     }
@@ -131,9 +175,9 @@ public class CSVBatchProcessor {
     }
 
     private static List<String> loadTableNames() {
-        File tables = new File("tables.txt");
+        File tables = new File("tables.config");
         if (!tables.exists()) {
-            LOGGER.warn("No tables.txt file found");
+            LOGGER.warn("No tables.config file found");
             try {
                 tables.createNewFile();
             } catch (IOException e) {
