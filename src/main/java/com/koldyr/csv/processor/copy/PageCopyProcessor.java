@@ -56,7 +56,7 @@ public class PageCopyProcessor extends BasePageProcessor {
             final CallWithRetry<Connection> getSrcConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             srcConnection = getSrcConnection.call();
             srcStatement = srcConnection.createStatement();
-            srcStatement.setFetchSize(FETCH_SIZE);
+            srcStatement.setFetchSize((int) Math.min(FETCH_SIZE, pageBlock.length));
 
             final String sql = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.getSrcSchema(), tableName);
             srcResultSet = srcStatement.executeQuery(sql);

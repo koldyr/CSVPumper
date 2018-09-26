@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -140,7 +141,9 @@ public class ImportProcessor extends BatchDBProcessor {
     @SuppressWarnings({"JDBCResourceOpenedButNotSafelyClosed", "resource"})
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {
         final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getDstSchema(), tableName);
-        final ResultSet resultSet = connection.createStatement().executeQuery(selectAll);
+        final Statement statement = connection.createStatement();
+        statement.setFetchSize(1);
+        final ResultSet resultSet = statement.executeQuery(selectAll);
         return resultSet.getMetaData();
     }
 }

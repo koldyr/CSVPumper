@@ -51,7 +51,7 @@ public class PageExportProcessor extends BasePageProcessor {
             final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
-            statement.setFetchSize(FETCH_SIZE);
+            statement.setFetchSize((int) Math.min(FETCH_SIZE, pageBlock.length));
 
             final String sql = SQLStatementFactory.getPageSQL(connection, pageBlock, context.getSrcSchema(), tableName);
             resultSet = statement.executeQuery(sql);

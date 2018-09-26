@@ -14,7 +14,9 @@ import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.koldyr.csv.Constants;
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+import static com.koldyr.csv.Constants.PARALLEL_PAGES;
+
 import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DbToDbPipeline;
 import com.koldyr.csv.model.PageBlockData;
@@ -97,7 +99,7 @@ public class CopyProcessor extends BatchDBProcessor {
 
         final String sqlInsert = SQLStatementFactory.getInsertValues(connection, context.getDstSchema(), tableName, columnCount);
 
-        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
+        int threadCount = Math.min(PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> copyThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             copyThreads.add(new PageCopyProcessor(context, tableName, dataPipeline, sqlInsert));
@@ -117,6 +119,7 @@ public class CopyProcessor extends BatchDBProcessor {
         try (Statement srcStatement = srcConnection.createStatement();
              PreparedStatement dstStatement = dstConnection.prepareStatement(insertSql)) {
             final String selectAll = SQLStatementFactory.getSelectAll(srcConnection, context.getSrcSchema(), tableName);
+            srcStatement.setFetchSize((int) Math.min(FETCH_SIZE, rowCount));
             resultSet = srcStatement.executeQuery(selectAll);
 
             int counter = 0;
@@ -143,6 +146,7 @@ public class CopyProcessor extends BatchDBProcessor {
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
             final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getSrcSchema(), tableName);
+            statement.setFetchSize(1);
             resultSet = statement.executeQuery(selectAll);
             return resultSet.getMetaData().getColumnCount();
         } finally {
