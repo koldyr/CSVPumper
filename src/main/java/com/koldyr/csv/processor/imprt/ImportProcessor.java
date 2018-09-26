@@ -117,6 +117,7 @@ public class ImportProcessor extends BatchDBProcessor {
         while (dataPipeline.next(statement, metaData)) {
             if (dataPipeline.counter() % step == 0) {
                 statement.executeBatch();
+                connection.commit();
                 dataPipeline.closeBatch();
 
                 final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);
@@ -125,6 +126,7 @@ public class ImportProcessor extends BatchDBProcessor {
         }
 
         statement.executeBatch();
+        connection.commit();
         dataPipeline.closeBatch();
     }
 

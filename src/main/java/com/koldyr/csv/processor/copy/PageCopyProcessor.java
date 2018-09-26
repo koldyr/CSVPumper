@@ -71,12 +71,14 @@ public class PageCopyProcessor extends BasePageProcessor {
 
                 if (counter % step == 0) {
                     dstStatement.executeBatch();
+                    dstConnection.commit();
                     final long percent = Math.round(counter / (double) pageBlock.length * 100.0);
                     LOGGER.debug("\t{}%", percent);
                 }
             }
 
             dstStatement.executeBatch();
+            dstConnection.commit();
 
             LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
         } finally {

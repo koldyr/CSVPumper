@@ -125,11 +125,13 @@ public class CopyProcessor extends BatchDBProcessor {
 
                 if (counter % step == 0) {
                     dstStatement.executeBatch();
+                    dstConnection.commit();
                     final long percent = Math.round(counter / rowCount * 100.0);
                     LOGGER.debug("\t{}%", percent);
                 }
             }
             dstStatement.executeBatch();
+            dstConnection.commit();
         } finally {
             if (resultSet != null) {
                 resultSet.close();
