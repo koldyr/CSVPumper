@@ -37,6 +37,10 @@ public class DatabaseDetector {
         return connection instanceof JdbcConnection;
     }
 
+    public static boolean isH2Sql(Connection connection) {
+        return connection instanceof org.h2.jdbc.JdbcConnection;
+    }
+
     public static boolean isMsSQLServer(Connection connection) {
         return connection instanceof ISQLServerConnection;
     }

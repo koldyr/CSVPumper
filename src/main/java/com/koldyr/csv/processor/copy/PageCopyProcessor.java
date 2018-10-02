@@ -17,7 +17,7 @@ import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
-import com.koldyr.csv.processor.CallWithRetry;
+import com.koldyr.csv.processor.RetryCall;
 
 /**
  * Description of class PageCopyProcessor
@@ -36,7 +36,7 @@ public class PageCopyProcessor extends BasePageProcessor {
         this.sqlInsert = sqlInsert;
     }
 
-    @Override
+    @Override @SuppressWarnings("resource")
     protected void execute(PageBlockData pageBlock) throws SQLException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
@@ -53,7 +53,7 @@ public class PageCopyProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getSrcConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
+            final RetryCall<Connection> getSrcConnection = new RetryCall<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             srcConnection = getSrcConnection.call();
             srcStatement = srcConnection.createStatement();
             srcStatement.setFetchSize((int) Math.min(FETCH_SIZE, pageBlock.length));
@@ -61,7 +61,7 @@ public class PageCopyProcessor extends BasePageProcessor {
             final String sql = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.getSrcSchema(), tableName);
             srcResultSet = srcStatement.executeQuery(sql);
 
-            final CallWithRetry<Connection> getDstConnection = new CallWithRetry<>(() -> context.get(PoolType.DESTINATION), 30, 2000, true);
+            final RetryCall<Connection> getDstConnection = new RetryCall<>(() -> context.get(PoolType.DESTINATION), 30, 2000, true);
             dstConnection = getDstConnection.call();
             dstStatement = dstConnection.prepareStatement(sqlInsert);
 

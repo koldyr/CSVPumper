@@ -14,7 +14,7 @@ import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
-import com.koldyr.csv.processor.CallWithRetry;
+import com.koldyr.csv.processor.RetryCall;
 
 /**
  * Description of class PageImportProcessor
@@ -37,7 +37,7 @@ public class PageImportProcessor extends BasePageProcessor {
         this.insertSql = insertSql;
     }
 
-    @Override
+    @Override @SuppressWarnings("resource")
     protected void execute(PageBlockData pageBlock) throws SQLException, IOException {
         Thread.currentThread().setName(tableName + '-' + pageBlock.index);
 
@@ -51,7 +51,7 @@ public class PageImportProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.DESTINATION), 30, 1000, true);
+            final RetryCall<Connection> getConnection = new RetryCall<>(() -> context.get(PoolType.DESTINATION), 30, 1000, true);
             connection = getConnection.call();
 
             statement = connection.prepareStatement(insertSql);
@@ -61,7 +61,7 @@ public class PageImportProcessor extends BasePageProcessor {
                 counter++;
 
                 if (counter % step == 0) {
-                    final CallWithRetry<int[]> executeBatch = new CallWithRetry<>(statement::executeBatch, 3, 1000, false);
+                    final RetryCall<int[]> executeBatch = new RetryCall<>(statement::executeBatch, 3, 1000, false);
                     executeBatch.call();
                     connection.commit();
                     dataPipeline.closeBatch();

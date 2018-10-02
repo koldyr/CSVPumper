@@ -104,50 +104,34 @@ public class CSVBatchProcessor {
             Constants.PARALLEL_TABLES = Integer.parseInt(config.getProperty("parallel-tables"));
             Constants.PARALLEL_PAGES = Integer.parseInt(config.getProperty("parallel-pages"));
 
-            Integer srcMaxConnections;
-            String srcQuoteString = null;
-
-            Connection connection = null;
-            try {
-                connection = connectionsPool.borrowObject(PoolType.SOURCE);
-                DatabaseMetaData databaseMetaData = connection.getMetaData();
-                srcMaxConnections = databaseMetaData.getMaxConnections();
-                if (srcMaxConnections == 0) {
-                    srcMaxConnections = Integer.MAX_VALUE;
-                }
-                srcQuoteString = databaseMetaData.getIdentifierQuoteString();
-            } catch (Exception e) {
-                srcMaxConnections = Integer.MAX_VALUE;
-            } finally {
-                if (connection != null) {
-                    connectionsPool.returnObject(PoolType.SOURCE, connection);
-                }
-            }
-
-            Integer dstMaxConnections;
-            String dstQuoteString = null;
-
-            try {
-                connection = connectionsPool.borrowObject(PoolType.DESTINATION);
-                DatabaseMetaData databaseMetaData = connection.getMetaData();
-                dstMaxConnections = databaseMetaData.getMaxConnections();
-                if (dstMaxConnections == 0) {
-                    dstMaxConnections = Integer.MAX_VALUE;
-                }
-                dstQuoteString = databaseMetaData.getIdentifierQuoteString();
-            } catch (Exception e) {
-                dstMaxConnections = Integer.MAX_VALUE;
-            } finally {
-                if (connection != null) {
-                    connectionsPool.returnObject(PoolType.DESTINATION, connection);
-                }
-            }
+            int srcMaxConnections = getMaxConnections(connectionsPool, PoolType.SOURCE);
+            int dstMaxConnections = getMaxConnections(connectionsPool, PoolType.DESTINATION);
 
             List<Integer> mxCons = Arrays.asList(Constants.MAX_CONNECTIONS, srcMaxConnections, dstMaxConnections);
             Constants.MAX_CONNECTIONS = Collections.min(mxCons);
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         }
+    }
+
+    private static int getMaxConnections(KeyedObjectPool<PoolType, Connection> connectionsPool, PoolType type) throws Exception {
+        int result;
+        Connection connection = null;
+        try {
+            connection = connectionsPool.borrowObject(type);
+            DatabaseMetaData databaseMetaData = connection.getMetaData();
+            result = databaseMetaData.getMaxConnections();
+            if (result == 0) {
+                result = Integer.MAX_VALUE;
+            }
+        } catch (Exception e) {
+            result = Integer.MAX_VALUE;
+        } finally {
+            if (connection != null) {
+                connectionsPool.returnObject(type, connection);
+            }
+        }
+        return result;
     }
 
     private static KeyedObjectPool<PoolType, Connection> createConnectionsPool(ConnectionData srcConfig, ConnectionData dstConfig) {

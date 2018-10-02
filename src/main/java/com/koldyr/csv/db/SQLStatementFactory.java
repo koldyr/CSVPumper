@@ -57,8 +57,9 @@ public class SQLStatementFactory {
         }
 
         boolean mySQL = isMySql(connection);
+        boolean h2SQL = isH2Sql(connection);
         boolean postgreSQL = isPostgreSQL(connection);
-        if (postgreSQL || mySQL) {
+        if (postgreSQL || mySQL || h2SQL) {
             return "SELECT * FROM " + schema + '.' + tableName + " ORDER BY 1 LIMIT " + pageBlock.length + " OFFSET " + pageBlock.start;
         }
 
