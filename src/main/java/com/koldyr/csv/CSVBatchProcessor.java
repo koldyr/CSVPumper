@@ -1,10 +1,8 @@
 package com.koldyr.csv;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.util.Arrays;
@@ -17,11 +15,15 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.LineIterator;
 import org.apache.commons.pool2.KeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.koldyr.csv.db.ConnectionsFactory;
 import com.koldyr.csv.model.ConnectionData;
@@ -170,15 +172,14 @@ public class CSVBatchProcessor {
             return Collections.emptyList();
         }
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(tables)))) {
+        try (LineIterator lines = IOUtils.lineIterator(new FileInputStream(tables), UTF_8)) {
             List<String> result = new LinkedList<>();
 
-            String line = reader.readLine();
-            while (line != null) {
+            while (lines.hasNext()) {
+                final String line = lines.next();
                 if (!line.startsWith("#")) {
                     result.add(line);
                 }
-                line = reader.readLine();
             }
             return result;
         } catch (IOException e) {
