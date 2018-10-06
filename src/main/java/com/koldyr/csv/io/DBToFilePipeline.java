@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -115,18 +116,19 @@ public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
                 return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(timestamp.toLocalDateTime());
             case Types.NUMERIC:
                 return resultSet.getBigDecimal(columnIndex);
-            case Types.BLOB:
             case Types.CLOB:
             case Types.NCLOB:
+                return saveCharStream(resultSet, columnIndex);
+            case Types.BLOB:
             case Types.BINARY:
             case Oid.TEXT:
-                return saveStream(resultSet, columnIndex);
+                return saveBinaryStream(resultSet, columnIndex);
             default:
                 return StringUtils.EMPTY;
         }
     }
 
-    private String saveStream(ResultSet resultSet, int columnIndex) throws SQLException {
+    private String saveBinaryStream(ResultSet resultSet, int columnIndex) throws SQLException {
         if (blobDir == null) {
             createBlobSubFolder();
         }
@@ -135,6 +137,22 @@ public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
         try (InputStream inputStream = resultSet.getBinaryStream(columnIndex);
              OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
             IOUtils.copy(inputStream, outputStream);
+            outputStream.flush();
+        } catch (IOException e) {
+            throw new SQLException(e);
+        }
+        return blobId;
+    }
+
+    private String saveCharStream(ResultSet resultSet, int columnIndex) throws SQLException {
+        if (blobDir == null) {
+            createBlobSubFolder();
+        }
+
+        final String blobId = UUID.randomUUID().toString();
+        try (Reader reader = resultSet.getCharacterStream(columnIndex);
+             OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
+            IOUtils.copy(reader, outputStream, UTF_8);
             outputStream.flush();
         } catch (IOException e) {
             throw new SQLException(e);

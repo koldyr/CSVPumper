@@ -2,9 +2,11 @@ package com.koldyr.csv.db;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 
 import org.postgresql.core.BaseConnection;
+import org.postgresql.jdbc.PgResultSetMetaData;
 import org.postgresql.jdbc.PgStatement;
 
 import oracle.jdbc.OracleConnection;
@@ -13,6 +15,7 @@ import oracle.jdbc.OracleResultSet;
 import com.mysql.cj.api.jdbc.JdbcConnection;
 
 import com.microsoft.sqlserver.jdbc.ISQLServerConnection;
+import com.microsoft.sqlserver.jdbc.SQLServerResultSetMetaData;
 
 /**
  * Description of class DatabaseDetector
@@ -51,5 +54,13 @@ public class DatabaseDetector {
 
     public static boolean isBLOBSupported(Statement statement) {
         return !(statement instanceof PgStatement);
+    }
+
+    public static boolean isMsSQLServer(ResultSetMetaData metaData) {
+        return metaData instanceof SQLServerResultSetMetaData;
+    }
+
+    public static boolean isPostgreSQL(ResultSetMetaData metaData) {
+        return metaData instanceof PgResultSetMetaData;
     }
 }

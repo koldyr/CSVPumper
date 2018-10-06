@@ -1,6 +1,3 @@
-/*
- * (c) 2012-2018 Swiss Re. All rights reserved.
- */
 package com.koldyr.csv.io;
 
 import java.io.InputStream;
@@ -12,9 +9,8 @@ import java.sql.Types;
 
 import org.postgresql.core.Oid;
 
+import static com.koldyr.csv.db.DatabaseDetector.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-
-import com.koldyr.csv.db.DatabaseDetector;
 
 /**
  * Description of class BaseDBPipeline
@@ -34,14 +30,14 @@ public abstract class BaseDBPipeline {
     protected void setLOB(PreparedStatement destination, int columnIndex, int columnType, InputStream lob) throws SQLException {
         switch (columnType) {
             case Types.BLOB:
-                if (DatabaseDetector.isBLOBSupported(destination)) {
+                if (isBLOBSupported(destination)) {
                     destination.setBlob(columnIndex, lob);
                 } else {
                     destination.setBinaryStream(columnIndex, lob);
                 }
                 break;
             case Types.CLOB:
-                if (DatabaseDetector.isCLOBSupported(destination)) {
+                if (isCLOBSupported(destination)) {
                     destination.setClob(columnIndex, new InputStreamReader(lob, UTF_8));
                 } else {
                     destination.setCharacterStream(columnIndex, new InputStreamReader(lob, UTF_8));
@@ -65,9 +61,22 @@ public abstract class BaseDBPipeline {
         int columnType = metaData.getColumnType(columnIndex);
 
         if (isString(columnType)) {
-            final String columnTypeName = metaData.getColumnTypeName(columnIndex);
-            if (columnTypeName.equals("text")) { // special case for Postgres TEXT type
-                columnType = Oid.TEXT;
+            if (isPostgreSQL(metaData)) {
+                final String columnTypeName = metaData.getColumnTypeName(columnIndex);
+                if (columnTypeName.equals("text")) {
+                    columnType = Oid.TEXT;
+                }
+            } else if (isMsSQLServer(metaData)) {
+                final int precision = metaData.getPrecision(columnIndex);
+                if (columnType == Types.VARCHAR) {
+                    if (precision == 2_147_483_647) {
+                        return Types.CLOB;
+                    }
+                } else if (columnType == Types.NVARCHAR) {
+                    if (precision == 1_073_741_823) {
+                        return Types.NCLOB;
+                    }
+                }
             }
         }
         return columnType;
