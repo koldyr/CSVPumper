@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Types;
 
 /**
  * Pipeline to load data from one table to directly another database , w/o intermediate file
@@ -46,6 +48,9 @@ public class DbToDbPipeline extends BaseDBPipeline {
             } else if (isLOB(columnType)) {
                 final InputStream lob = source.getBinaryStream(columnIndex);
                 setLOB(destination, columnIndex, columnType, lob);
+            } else if (columnType == Types.TIMESTAMP) {
+                final Timestamp timestamp = source.getTimestamp(columnIndex);
+                destination.setTimestamp(columnIndex, timestamp);
             } else {
                 final Object value = source.getObject(columnIndex);
                 destination.setObject(columnIndex, value, columnType);
