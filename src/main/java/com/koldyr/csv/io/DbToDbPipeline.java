@@ -19,11 +19,10 @@ public class DbToDbPipeline extends BaseDBPipeline {
         if (source.next()) {
             try {
                 copyValues(source, destination);
+                destination.addBatch();
             } catch (Exception e) {
                 throw new SQLException("Row num " + source.getRow(), e);
             }
-
-            destination.addBatch();
 
             return true;
         }

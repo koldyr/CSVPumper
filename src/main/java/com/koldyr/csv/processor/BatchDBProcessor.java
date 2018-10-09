@@ -36,10 +36,9 @@ public abstract class BatchDBProcessor implements Callable<Object> {
 
     @Override
     public Object call() {
-        String tableName = context.getNextTable();
-        while (tableName != null) {
+        String tableName;
+        while ((tableName = context.getNextTable()) != null) {
             processTable(tableName);
-            tableName = context.getNextTable();
         }
 
         return null;

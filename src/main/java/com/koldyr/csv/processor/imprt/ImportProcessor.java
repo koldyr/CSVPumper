@@ -39,8 +39,8 @@ public class ImportProcessor extends BatchDBProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ImportProcessor.class);
 
-    public ImportProcessor(ProcessorContext config) {
-        super(config);
+    public ImportProcessor(ProcessorContext context) {
+        super(context);
     }
 
     @Override
@@ -67,7 +67,11 @@ public class ImportProcessor extends BatchDBProcessor {
                 singleImport(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            if (LOGGER.isDebugEnabled()) {
+                String count = format.format(rowCount);
+                String duration = format.format(System.currentTimeMillis() - start);
+                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration);
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {

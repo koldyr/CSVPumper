@@ -64,7 +64,11 @@ public class CopyProcessor extends BatchDBProcessor {
                 copy(srcConnection, dstConnection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            if (LOGGER.isDebugEnabled()) {
+                String count = format.format(rowCount);
+                String duration = format.format(System.currentTimeMillis() - start);
+                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration);
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
@@ -129,7 +133,7 @@ public class CopyProcessor extends BatchDBProcessor {
                 if (counter % step == 0) {
                     dstStatement.executeBatch();
                     dstConnection.commit();
-                    final long percent = Math.round(counter / rowCount * 100.0);
+                    final long percent = Math.round(counter / (double) rowCount * 100.0);
                     LOGGER.debug("\t{}%", percent);
                 }
             }

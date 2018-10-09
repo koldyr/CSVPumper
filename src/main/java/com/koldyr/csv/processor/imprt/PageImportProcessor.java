@@ -75,7 +75,10 @@ public class PageImportProcessor extends BasePageProcessor {
             connection.commit();
             dataPipeline.closeBatch();
 
-            LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
+            if (LOGGER.isDebugEnabled()) {
+                String duration = format.format(System.currentTimeMillis() - startPage);
+                LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, duration);
+            }
         } finally {
             try {
                 if (statement != null) {

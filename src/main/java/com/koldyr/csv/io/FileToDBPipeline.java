@@ -77,11 +77,10 @@ public class FileToDBPipeline extends BaseDBPipeline implements Closeable {
 
         try {
             setRowValues(statement, metaData, rowData);
+            statement.addBatch();
         } catch (Exception e) {
             throw new SQLException(rowData, e);
         }
-
-        statement.addBatch();
 
         return true;
     }

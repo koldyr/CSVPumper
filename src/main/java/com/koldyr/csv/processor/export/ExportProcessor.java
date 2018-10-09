@@ -34,8 +34,8 @@ public class ExportProcessor extends BatchDBProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExportProcessor.class);
 
-    public ExportProcessor(ProcessorContext config) {
-        super(config);
+    public ExportProcessor(ProcessorContext context) {
+        super(context);
     }
 
     @Override
@@ -61,7 +61,11 @@ public class ExportProcessor extends BatchDBProcessor {
                 export(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            if (LOGGER.isDebugEnabled()) {
+                String count = format.format(rowCount);
+                String duration = format.format(System.currentTimeMillis() - start);
+                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration);
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {

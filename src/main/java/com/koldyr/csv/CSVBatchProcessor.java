@@ -147,14 +147,14 @@ public class CSVBatchProcessor {
         return new GenericKeyedObjectPool<>(factory, config);
     }
 
-    private static Callable<Object> createProcessor(Operation operation, ProcessorContext commonConfig) {
+    private static Callable<Object> createProcessor(Operation operation, ProcessorContext context) {
         switch (operation) {
             case EXPORT:
-                return new ExportProcessor(commonConfig);
+                return new ExportProcessor(context);
             case IMPORT:
-                return new ImportProcessor(commonConfig);
+                return new ImportProcessor(context);
             case COPY:
-                return new CopyProcessor(commonConfig);
+                return new CopyProcessor(context);
         }
 
         throw new IllegalArgumentException("Unsupported operation " + operation);
