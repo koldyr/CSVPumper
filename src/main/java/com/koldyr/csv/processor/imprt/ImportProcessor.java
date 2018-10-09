@@ -125,7 +125,7 @@ public class ImportProcessor extends BatchDBProcessor {
                 connection.commit();
                 dataPipeline.closeBatch();
 
-                final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);
+                final long percent = Math.round(dataPipeline.counter() / (double) rowCount * 100.0);
                 LOGGER.debug("\t{}%", percent);
             }
         }
