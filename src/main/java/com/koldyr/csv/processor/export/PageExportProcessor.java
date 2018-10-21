@@ -10,14 +10,15 @@ import java.sql.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
 import com.koldyr.csv.model.ProcessorContext;
 import com.koldyr.csv.processor.BasePageProcessor;
-import com.koldyr.csv.processor.CallWithRetry;
-
-import static com.koldyr.csv.Constants.FETCH_SIZE;
+import com.koldyr.csv.processor.RetryCall;
 
 /**
  * Description of class PageExportProcessor
@@ -47,20 +48,15 @@ public class PageExportProcessor extends BasePageProcessor {
             long startPage = System.currentTimeMillis();
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index);
 
-            final CallWithRetry<Connection> getConnection = new CallWithRetry<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
+            final RetryCall<Connection> getConnection = new RetryCall<>(() -> context.get(PoolType.SOURCE), 30, 2000, true);
             connection = getConnection.call();
             statement = connection.createStatement();
-            statement.setFetchSize(FETCH_SIZE);
+            statement.setFetchSize((int) Math.min(FETCH_SIZE, pageBlock.length));
 
-            String sql = getPageSQL(connection, pageBlock);
-
+            final String sql = SQLStatementFactory.getPageSQL(connection, pageBlock, context.getSrcSchema(), tableName);
             resultSet = statement.executeQuery(sql);
 
-            final ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            if (sql.contains("RNUM")) {// remove ROWNUM column
-                columnCount--;
-            }
+            final int columnCount = getColumnCount(resultSet, sql);
 
             int counter = 0;
             while (dataPipeline.next(resultSet, columnCount)) {
@@ -75,7 +71,10 @@ public class PageExportProcessor extends BasePageProcessor {
 
             dataPipeline.flush();
 
-            LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, format.format(System.currentTimeMillis() - startPage));
+            if (LOGGER.isDebugEnabled()) {
+                String duration = format.format(System.currentTimeMillis() - startPage);
+                LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, duration);
+            }
         } finally {
             try {
                 if (resultSet != null) {
@@ -91,5 +90,14 @@ public class PageExportProcessor extends BasePageProcessor {
                 LOGGER.error(e.getMessage(), e);
             }
         }
+    }
+
+    private int getColumnCount(ResultSet resultSet, String sql) throws SQLException {
+        final ResultSetMetaData metaData = resultSet.getMetaData();
+        int columnCount = metaData.getColumnCount();
+        if (sql.contains("RNUM")) {// remove ROWNUM column
+            columnCount--;
+        }
+        return columnCount;
     }
 }

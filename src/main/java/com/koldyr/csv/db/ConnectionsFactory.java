@@ -29,10 +29,14 @@ public class ConnectionsFactory extends BaseKeyedPooledObjectFactory<PoolType, C
     @Override
     public Connection create(PoolType key) throws Exception {
         if (key == PoolType.SOURCE) {
-            return DriverManager.getConnection(srcConfig.getUrl(), srcConfig.getUser(), srcConfig.getPassword());
+            Connection connection = DriverManager.getConnection(srcConfig.getUrl(), srcConfig.getUser(), srcConfig.getPassword());
+            connection.setAutoCommit(false);
+            return connection;
         }
 
-        return DriverManager.getConnection(dstConfig.getUrl(), dstConfig.getUser(), dstConfig.getPassword());
+        Connection connection = DriverManager.getConnection(dstConfig.getUrl(), dstConfig.getUser(), dstConfig.getPassword());
+        connection.setAutoCommit(false);
+        return connection;
     }
 
     @Override

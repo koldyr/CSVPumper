@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
 
 /**
@@ -12,17 +13,16 @@ import java.sql.Types;
  *
  * @created: 2018.03.18
  */
-public class DbToDbPipeline {
+public class DbToDbPipeline extends BaseDBPipeline {
 
     public boolean next(ResultSet source, PreparedStatement destination) throws SQLException {
         if (source.next()) {
             try {
                 copyValues(source, destination);
+                destination.addBatch();
             } catch (Exception e) {
                 throw new SQLException("Row num " + source.getRow(), e);
             }
-
-            destination.addBatch();
 
             return true;
         }
@@ -31,21 +31,25 @@ public class DbToDbPipeline {
     }
 
     private void copyValues(ResultSet source, PreparedStatement destination) throws SQLException {
-        ResultSetMetaData metaData = source.getMetaData();
-        int columnCount = metaData.getColumnCount();
+        ResultSetMetaData srcMetaData = source.getMetaData();
+        int columnCount = srcMetaData.getColumnCount();
 
         if (hasNonDataColumns(source)) {
             columnCount--;
         }
 
         for (int columnIndex = 1; columnIndex <= columnCount; columnIndex++) {
-            final int columnType = metaData.getColumnType(columnIndex);
+            final int columnType = getColumnType(srcMetaData, columnIndex);
+
             if (isString(columnType)) {
                 final String value = source.getString(columnIndex);
                 destination.setString(columnIndex, value);
-            } else if (isBlob(columnType)) {
-                final InputStream value = source.getBinaryStream(columnIndex);
-                destination.setBinaryStream(columnIndex, value);
+            } else if (isLOB(columnType)) {
+                final InputStream lob = source.getBinaryStream(columnIndex);
+                setLOB(destination, columnIndex, columnType, lob);
+            } else if (columnType == Types.TIMESTAMP) {
+                final Timestamp timestamp = source.getTimestamp(columnIndex);
+                destination.setTimestamp(columnIndex, timestamp);
             } else {
                 final Object value = source.getObject(columnIndex);
                 destination.setObject(columnIndex, value, columnType);
@@ -59,13 +63,5 @@ public class DbToDbPipeline {
         } catch (SQLException e) {
             return false;
         }
-    }
-
-    private boolean isString(int columnType) {
-        return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
-    }
-
-    private boolean isBlob(int columnType) {
-        return columnType == Types.BLOB || columnType == Types.CLOB || columnType == Types.NCLOB || columnType == Types.LONGNVARCHAR;
     }
 }

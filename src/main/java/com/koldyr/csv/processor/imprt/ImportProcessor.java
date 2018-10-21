@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -22,6 +23,7 @@ import static com.koldyr.csv.db.DatabaseDetector.isOracle;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.koldyr.csv.Constants;
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.FileToDBPipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
@@ -37,8 +39,8 @@ public class ImportProcessor extends BatchDBProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ImportProcessor.class);
 
-    public ImportProcessor(ProcessorContext config) {
-        super(config);
+    public ImportProcessor(ProcessorContext context) {
+        super(context);
     }
 
     @Override
@@ -65,7 +67,11 @@ public class ImportProcessor extends BatchDBProcessor {
                 singleImport(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            if (LOGGER.isDebugEnabled()) {
+                String count = format.format(rowCount);
+                String duration = format.format(System.currentTimeMillis() - start);
+                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration);
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
@@ -94,7 +100,7 @@ public class ImportProcessor extends BatchDBProcessor {
         context.setPages(tableName, pages);
 
         final ResultSetMetaData metaData = getMetaData(connection, tableName);
-        final String insertSql = createInsertSql(context.getDstSchema(), tableName, metaData.getColumnCount());
+        final String insertSql = SQLStatementFactory.getInsertValues(connection, context.getDstSchema(), tableName, metaData.getColumnCount());
 
         final Collection<Callable<Integer>> importThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
@@ -109,21 +115,23 @@ public class ImportProcessor extends BatchDBProcessor {
     private void singleImport(Connection connection, FileToDBPipeline dataPipeline, String tableName, long rowCount) throws SQLException, IOException {
         final double step = context.getPageSize() / 100.0;
 
-        ResultSetMetaData metaData = getMetaData(connection, tableName);
-        String sql = createInsertSql(context.getDstSchema(), tableName, metaData.getColumnCount());
-        PreparedStatement statement = connection.prepareStatement(sql);
+        final ResultSetMetaData metaData = getMetaData(connection, tableName);
+        final String sql = SQLStatementFactory.getInsertValues(connection, context.getDstSchema(), tableName, metaData.getColumnCount());
+        final PreparedStatement statement = connection.prepareStatement(sql);
 
         while (dataPipeline.next(statement, metaData)) {
             if (dataPipeline.counter() % step == 0) {
                 statement.executeBatch();
+                connection.commit();
                 dataPipeline.closeBatch();
 
-                final long percent = Math.round(dataPipeline.counter() / rowCount * 100.0);
+                final long percent = Math.round(dataPipeline.counter() / (double) rowCount * 100.0);
                 LOGGER.debug("\t{}%", percent);
             }
         }
 
         statement.executeBatch();
+        connection.commit();
         dataPipeline.closeBatch();
     }
 
@@ -136,7 +144,10 @@ public class ImportProcessor extends BatchDBProcessor {
      */
     @SuppressWarnings({"JDBCResourceOpenedButNotSafelyClosed", "resource"})
     private ResultSetMetaData getMetaData(Connection connection, String tableName) throws SQLException {
-        ResultSet resultSet = connection.createStatement().executeQuery("SELECT * FROM \"" + context.getDstSchema() + "\".\"" + tableName + '"');
+        final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getDstSchema(), tableName);
+        final Statement statement = connection.createStatement();
+        statement.setFetchSize(1);
+        final ResultSet resultSet = statement.executeQuery(selectAll);
         return resultSet.getMetaData();
     }
 }

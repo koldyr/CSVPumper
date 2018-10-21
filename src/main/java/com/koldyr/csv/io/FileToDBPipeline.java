@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+import org.postgresql.core.Oid;
 
 import static com.koldyr.csv.io.DBToFilePipeline.BLOB_FILE_EXT;
 import static com.koldyr.csv.io.DBToFilePipeline.stripExtension;
@@ -42,7 +43,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  *
  * @created: 2018.03.07
  */
-public class FileToDBPipeline implements Closeable {
+public class FileToDBPipeline extends BaseDBPipeline implements Closeable {
 
     private static final Pattern CARRIAGE_RETURN = Pattern.compile("\\\\n");
     private static final String CR_REPLACEMENT = "\n";
@@ -76,11 +77,10 @@ public class FileToDBPipeline implements Closeable {
 
         try {
             setRowValues(statement, metaData, rowData);
+            statement.addBatch();
         } catch (Exception e) {
             throw new SQLException(rowData, e);
         }
-
-        statement.addBatch();
 
         return true;
     }
@@ -128,7 +128,7 @@ public class FileToDBPipeline implements Closeable {
     }
 
     private void setValue(ResultSetMetaData metaData, PreparedStatement statement, int columnIndex, String value) throws SQLException {
-        final int columnType = metaData.getColumnType(columnIndex);
+        int columnType = getColumnType(metaData, columnIndex);
 
         if (isString(columnType)) {
             if (value == null) {
@@ -183,37 +183,24 @@ public class FileToDBPipeline implements Closeable {
             case Types.BLOB:
             case Types.CLOB:
             case Types.NCLOB:
-                setBlob(statement, columnIndex, value, columnType);
+            case Types.BINARY:
+            case Oid.TEXT:
+                setLOB(statement, columnIndex, value, columnType);
                 break;
             default:
                 statement.setObject(columnIndex, v, columnType);
         }
     }
 
-    private void setBlob(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
+    private void setLOB(PreparedStatement statement, int columnIndex, String blobId, int columnType) throws SQLException {
         try {
-            final InputStream inputStream = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
-            blobStreams.add(inputStream);
+            final InputStream lob = new FileInputStream(new File(blobDir, blobId + BLOB_FILE_EXT));
+            blobStreams.add(lob);
 
-            switch (columnType) {
-                case Types.BLOB:
-                    statement.setBlob(columnIndex, inputStream);
-                    break;
-                case Types.CLOB:
-                    statement.setClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
-                    break;
-                case Types.NCLOB:
-                    statement.setNClob(columnIndex, new InputStreamReader(inputStream, UTF_8));
-                    break;
-                default:
-            }
+            setLOB(statement, columnIndex, columnType, lob);
         } catch (FileNotFoundException e) {
             throw new SQLException(e);
         }
-    }
-
-    private boolean isString(int columnType) {
-        return columnType == Types.VARCHAR || columnType == Types.NVARCHAR || columnType == Types.NCHAR || columnType == Types.CHAR;
     }
 
     @Override

@@ -15,7 +15,10 @@ import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.koldyr.csv.Constants;
+import static com.koldyr.csv.Constants.FETCH_SIZE;
+import static com.koldyr.csv.Constants.PARALLEL_PAGES;
+
+import com.koldyr.csv.db.SQLStatementFactory;
 import com.koldyr.csv.io.DBToFilePipeline;
 import com.koldyr.csv.model.PageBlockData;
 import com.koldyr.csv.model.PoolType;
@@ -31,8 +34,8 @@ public class ExportProcessor extends BatchDBProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExportProcessor.class);
 
-    public ExportProcessor(ProcessorContext config) {
-        super(config);
+    public ExportProcessor(ProcessorContext context) {
+        super(context);
     }
 
     @Override
@@ -58,7 +61,11 @@ public class ExportProcessor extends BatchDBProcessor {
                 export(connection, dataPipeline, tableName, rowCount);
             }
 
-            LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, format.format(rowCount), format.format(System.currentTimeMillis() - start));
+            if (LOGGER.isDebugEnabled()) {
+                String count = format.format(rowCount);
+                String duration = format.format(System.currentTimeMillis() - start);
+                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration);
+            }
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
         } finally {
@@ -71,7 +78,9 @@ public class ExportProcessor extends BatchDBProcessor {
 
         ResultSet resultSet = null;
         try (Statement statement = connection.createStatement()) {
-            resultSet = statement.executeQuery("SELECT * FROM " + context.getSrcSchema() + '.' + tableName);
+            final String selectAll = SQLStatementFactory.getSelectAll(connection, context.getSrcSchema(), tableName);
+            statement.setFetchSize((int) Math.min(FETCH_SIZE, rowCount));
+            resultSet = statement.executeQuery(selectAll);
 
             final ResultSetMetaData metaData = resultSet.getMetaData();
             final int columnCount = metaData.getColumnCount();
@@ -108,7 +117,7 @@ public class ExportProcessor extends BatchDBProcessor {
 
         context.setPages(tableName, pages);
 
-        int threadCount = Math.min(Constants.PARALLEL_PAGES, pageCount);
+        int threadCount = Math.min(PARALLEL_PAGES, pageCount);
         final Collection<Callable<Integer>> exportThreads = new ArrayList<>(threadCount);
         for (int i = 0; i < threadCount; i++) {
             exportThreads.add(new PageExportProcessor(context, tableName, dataPipeline));
