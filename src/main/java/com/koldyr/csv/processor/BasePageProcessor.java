@@ -34,8 +34,8 @@ public abstract class BasePageProcessor implements Callable<Integer> {
     public Integer call() {
         int processedBlocks = 0;
 
-        PageBlockData pageBlock = context.getNextPageBlock(tableName);
-        while (pageBlock != null) {
+        PageBlockData pageBlock;
+        while ((pageBlock = context.getNextPageBlock(tableName)) != null) {
             try {
                 execute(pageBlock);
 
@@ -44,8 +44,6 @@ public abstract class BasePageProcessor implements Callable<Integer> {
                 LoggerFactory.getLogger(getClass()).error(e.getMessage(), e);
                 return processedBlocks;
             }
-
-            pageBlock = context.getNextPageBlock(tableName);
         }
 
         return processedBlocks;
