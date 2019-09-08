@@ -3,13 +3,12 @@ package com.koldyr.csv.io;
 import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.nio.file.Files;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -46,13 +45,15 @@ public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
     private File blobDir;
     private final File csvFile;
 
-    public DBToFilePipeline(String fileName) throws FileNotFoundException {
+    public DBToFilePipeline(String fileName) throws IOException {
+        super();
+
         csvFile = new File(fileName);
         final File dir = csvFile.getParentFile();
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFile, true), UTF_8));
+        output = Files.newBufferedWriter(csvFile.toPath(), UTF_8);
     }
 
     public void flush() throws IOException {
@@ -134,8 +135,9 @@ public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
         }
 
         final String blobId = UUID.randomUUID().toString();
+        final File blobFile = new File(blobDir, blobId + BLOB_FILE_EXT);
         try (InputStream inputStream = resultSet.getBinaryStream(columnIndex);
-             OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
+             OutputStream outputStream = new FileOutputStream(blobFile)) {
             IOUtils.copy(inputStream, outputStream);
             outputStream.flush();
         } catch (IOException e) {
@@ -150,8 +152,9 @@ public class DBToFilePipeline extends BaseDBPipeline implements Closeable {
         }
 
         final String blobId = UUID.randomUUID().toString();
+        final File blobFile = new File(blobDir, blobId + BLOB_FILE_EXT);
         try (Reader reader = resultSet.getCharacterStream(columnIndex);
-             OutputStream outputStream = new FileOutputStream(new File(blobDir, blobId + BLOB_FILE_EXT))) {
+             OutputStream outputStream = new FileOutputStream(blobFile)) {
             IOUtils.copy(reader, outputStream, UTF_8);
             outputStream.flush();
         } catch (IOException e) {

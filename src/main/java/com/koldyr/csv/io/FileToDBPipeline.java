@@ -8,9 +8,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.CharBuffer;
+import java.nio.file.Files;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
@@ -58,11 +58,11 @@ public class FileToDBPipeline extends BaseDBPipeline implements Closeable {
 
     private final Collection<InputStream> blobStreams = new LinkedList<>();
 
-    public FileToDBPipeline(String fileName) throws FileNotFoundException {
+    public FileToDBPipeline(String fileName) throws IOException {
         final File csvFile = new File(fileName);
 
         blobDir = new File(csvFile.getParentFile(), stripExtension(csvFile));
-        reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), UTF_8));
+        reader = Files.newBufferedReader(csvFile.toPath(), UTF_8);
     }
 
     public long counter() {
