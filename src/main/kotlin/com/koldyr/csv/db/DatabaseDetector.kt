@@ -2,7 +2,7 @@ package com.koldyr.csv.db
 
 import com.microsoft.sqlserver.jdbc.ISQLServerConnection
 import com.microsoft.sqlserver.jdbc.SQLServerResultSetMetaData
-import com.mysql.cj.api.jdbc.JdbcConnection
+import com.mysql.cj.jdbc.JdbcConnection
 import oracle.jdbc.OracleConnection
 import oracle.jdbc.OracleResultSet
 import org.postgresql.core.BaseConnection

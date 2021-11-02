@@ -10,9 +10,7 @@ import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BatchDBProcessor
 import org.slf4j.LoggerFactory
 import java.sql.Connection
-import java.sql.ResultSet
 import java.sql.SQLException
-import java.util.*
 import java.util.concurrent.Callable
 import kotlin.math.ceil
 import kotlin.math.min
@@ -89,9 +87,9 @@ class CopyProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
             context.release(PoolType.SOURCE, connection)
         }
 
-        val sqlInsert = SQLStatementFactory.getInsertValues(connection, context.dstSchema, tableName, columnCount)
+        val sqlInsert = SQLStatementFactory.getInsertValues(connection!!, context.dstSchema, tableName, columnCount)
 
-        val threadCount = Math.min(PARALLEL_PAGES, pageCount)
+        val threadCount = min(PARALLEL_PAGES, pageCount)
         val copyThreads = ArrayList<Callable<Int>>(threadCount)
         for (i in 0 until threadCount) {
             copyThreads.add(PageCopyProcessor(context, tableName, dataPipeline, sqlInsert))
@@ -108,10 +106,11 @@ class CopyProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
 
         val columnCount = getColumnCount(srcConnection, tableName)
         val insertSql = SQLStatementFactory.getInsertValues(dstConnection, context.dstSchema, tableName, columnCount)
+
         srcConnection.createStatement().use { srcStatement ->
             dstConnection.prepareStatement(insertSql).use { dstStatement ->
                 val selectAll = SQLStatementFactory.getSelectAll(srcConnection, context.srcSchema, tableName)
-                srcStatement.fetchSize = Math.min(FETCH_SIZE.toLong(), rowCount).toInt()
+                srcStatement.fetchSize = min(FETCH_SIZE.toLong(), rowCount).toInt()
 
                 srcStatement.executeQuery(selectAll).use { resultSet ->
                     var counter = 0
@@ -131,28 +130,24 @@ class CopyProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
                 dstConnection.commit()
             }
         }
-
     }
 
     @Throws(SQLException::class)
-    private fun getColumnCount(connection: Connection?, tableName: String): Int {
-        var resultSet: ResultSet? = null
+    private fun getColumnCount(connection: Connection, tableName: String): Int {
         try {
-            connection!!.createStatement().use { statement ->
+            connection.createStatement().use { statement ->
                 val selectAll = SQLStatementFactory.getSelectAll(connection, context.srcSchema, tableName)
                 statement.fetchSize = 1
-                resultSet = statement.executeQuery(selectAll)
-                return resultSet!!.metaData.columnCount
+
+                statement.executeQuery(selectAll).use {
+                    return it.metaData.columnCount
+                }
             }
         } finally {
-            if (resultSet != null) {
-                resultSet!!.close()
-            }
         }
     }
 
     companion object {
-
         private val LOGGER = LoggerFactory.getLogger(CopyProcessor::class.java)
     }
 }

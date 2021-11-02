@@ -24,12 +24,12 @@ class PageImportProcessor(
         context: ProcessorContext,
         tableName: String,
         private val metaData: ResultSetMetaData,
-        private val dataPipeline: FileToDBPipeline,
+        private val pipeline: FileToDBPipeline,
         private val insertSql: String) : BasePageProcessor(tableName, context) {
 
     @Throws(SQLException::class, IOException::class)
     override fun execute(pageBlock: PageBlockData) {
-        Thread.currentThread().name = tableName + '-'.toString() + pageBlock.index
+        Thread.currentThread().name = "$tableName-${pageBlock.index}"
 
         val step = context.pageSize / 100.0
         val totalRowCount = pageBlock.length.toDouble()
@@ -48,7 +48,7 @@ class PageImportProcessor(
             statement = connection!!.prepareStatement(insertSql)
 
             var counter = 0
-            while (dataPipeline.next(statement, metaData)) {
+            while (pipeline.next(statement, metaData)) {
                 counter++
 
                 if (counter % step == 0.0) {
@@ -56,16 +56,16 @@ class PageImportProcessor(
                     val executeBatch = RetryCall(commandExecuteBatch, 3, 1000, false)
                     executeBatch.call()
                     connection.commit()
-                    dataPipeline.closeBatch()
+                    pipeline.closeBatch()
 
-                    val percent = (dataPipeline.counter() / totalRowCount * 100.0).roundToLong()
+                    val percent = (pipeline.counter() / totalRowCount * 100.0).roundToLong()
                     LOGGER.debug("\t{}%", percent)
                 }
             }
 
             statement!!.executeBatch()
             connection.commit()
-            dataPipeline.closeBatch()
+            pipeline.closeBatch()
 
             if (LOGGER.isDebugEnabled) {
                 val duration = format.format(System.currentTimeMillis() - startPage)

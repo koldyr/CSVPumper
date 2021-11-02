@@ -38,7 +38,7 @@ class PageExportProcessor(
             val startPage = System.currentTimeMillis()
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index)
 
-            val command = Callable{ context.get(PoolType.SOURCE) }
+            val command = Callable{ context[PoolType.SOURCE] }
             val getConnection = RetryCall(command, 30, 2000, true)
             connection = getConnection.call()
 

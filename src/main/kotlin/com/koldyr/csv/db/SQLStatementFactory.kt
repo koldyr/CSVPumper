@@ -18,7 +18,7 @@ object SQLStatementFactory {
     private val quotedSqlGenerator = QuotedSQLGenerator()
     private val plainSqlGenerator = PlainSQLGenerator()
 
-    private fun selectGenerator(connection: Connection?): SQLGenerator {
+    private fun selectGenerator(connection: Connection): SQLGenerator {
         val quoted = isPostgreSQL(connection) || isMsSQLServer(connection)
         return if (quoted) quotedSqlGenerator else plainSqlGenerator
     }
@@ -29,7 +29,7 @@ object SQLStatementFactory {
         return generator.getSelectAll(schema, tableName)
     }
 
-    fun getInsertValues(connection: Connection?, schema: String, tableName: String, columnCount: Int): String {
+    fun getInsertValues(connection: Connection, schema: String, tableName: String, columnCount: Int): String {
         val generator = selectGenerator(connection)
 
         val values = StringJoiner(",")

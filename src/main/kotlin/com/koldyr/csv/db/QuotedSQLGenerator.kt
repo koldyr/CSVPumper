@@ -1,6 +1,6 @@
 package com.koldyr.csv.db
 
-import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang3.StringUtils
 
 /**
  * Description of class QuotedSQLGenerator

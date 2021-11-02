@@ -16,7 +16,8 @@ import java.util.concurrent.Future
  *
  * @created: 2018.03.03
  */
-abstract class BatchDBProcessor protected constructor(protected val context: ProcessorContext) : Callable<Any> {
+abstract class BatchDBProcessor
+    protected constructor(protected val context: ProcessorContext) : Callable<Any> {
 
     protected val format: DecimalFormat
 

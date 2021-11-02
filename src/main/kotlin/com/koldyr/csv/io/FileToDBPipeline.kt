@@ -1,21 +1,21 @@
 package com.koldyr.csv.io
 
 import com.koldyr.csv.io.DBToFilePipeline.Companion.BLOB_FILE_EXT
-import org.apache.commons.lang.StringEscapeUtils
-import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang3.StringEscapeUtils
+import org.apache.commons.lang3.StringUtils
 import org.postgresql.core.Oid
 import java.io.BufferedReader
 import java.io.CharArrayWriter
 import java.io.Closeable
-import java.io.File
-import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import java.math.BigDecimal
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets.*
-import java.nio.file.Files
+import java.nio.file.Files.*
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.sql.Date
 import java.sql.PreparedStatement
 import java.sql.ResultSetMetaData
@@ -26,10 +26,10 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
-import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.regex.Pattern
+import kotlin.io.path.nameWithoutExtension
 
 /**
  * Pipeline to load data from cvs file to database table
@@ -37,7 +37,7 @@ import java.util.regex.Pattern
  * @created: 2018.03.07
  */
 class FileToDBPipeline @Throws(IOException::class)
-constructor(fileName: String) : BaseDBPipeline(), Closeable {
+constructor(csvFile: Path) : BaseDBPipeline(), Closeable {
 
     private val fileLock = ReentrantReadWriteLock()
 
@@ -45,15 +45,14 @@ constructor(fileName: String) : BaseDBPipeline(), Closeable {
 
     private val counter = AtomicLong()
 
-    private val blobDir: File
+    private val blobDir: Path
 
-    private val blobStreams = LinkedList<InputStream>()
+    private val blobStreams = mutableListOf<InputStream>()
 
     init {
-        val csvFile = File(fileName)
-
-        blobDir = File(csvFile.parentFile, csvFile.nameWithoutExtension)
-        reader = Files.newBufferedReader(csvFile.toPath(), UTF_8)
+        blobDir = Paths.get(csvFile.parent.toString(), csvFile.nameWithoutExtension)
+        createDirectories(blobDir)
+        reader = newBufferedReader(csvFile, UTF_8)
     }
 
     fun counter(): Long {
@@ -168,7 +167,7 @@ constructor(fileName: String) : BaseDBPipeline(), Closeable {
     @Throws(SQLException::class)
     private fun setLOB(statement: PreparedStatement, columnIndex: Int, blobId: String, columnType: Int) {
         try {
-            val lob = FileInputStream(File(blobDir, blobId + BLOB_FILE_EXT))
+            val lob = newInputStream(Paths.get(blobDir.toString(), blobId + BLOB_FILE_EXT))
             blobStreams.add(lob)
 
             setLOB(statement, columnIndex, columnType, lob)

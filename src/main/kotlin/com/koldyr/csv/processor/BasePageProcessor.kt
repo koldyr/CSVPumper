@@ -14,7 +14,11 @@ import java.util.concurrent.Callable
  *
  * @created: 2018.03.10
  */
-abstract class BasePageProcessor protected constructor(protected val tableName: String, protected val context: ProcessorContext) : Callable<Int> {
+abstract class BasePageProcessor
+    protected constructor(
+            protected val tableName: String,
+            protected val context: ProcessorContext) : Callable<Int> {
+    
     protected val format: DecimalFormat
 
     init {

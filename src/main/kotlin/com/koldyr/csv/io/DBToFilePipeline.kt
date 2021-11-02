@@ -1,22 +1,22 @@
 package com.koldyr.csv.io
 
 import org.apache.commons.io.IOUtils
-import org.apache.commons.lang.StringEscapeUtils
-import org.apache.commons.lang.StringUtils
+import org.apache.commons.lang3.StringEscapeUtils
+import org.apache.commons.lang3.StringUtils
 import org.postgresql.core.Oid
 import java.io.BufferedWriter
 import java.io.Closeable
-import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.charset.StandardCharsets.*
-import java.nio.file.Files
+import java.nio.file.Files.*
+import java.nio.file.Path
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Types
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.regex.Pattern
+import kotlin.io.path.nameWithoutExtension
 
 /**
  * Pipeline to load data from db table into csv file. Blob/clob columns will be stored in dedicated sub-folder
@@ -24,19 +24,18 @@ import java.util.regex.Pattern
  * @created: 2018.03.05
  */
 class DBToFilePipeline @Throws(IOException::class)
-constructor(fileName: String) : BaseDBPipeline(), Closeable {
+constructor(csvFile: Path) : BaseDBPipeline(), Closeable {
 
     private val output: BufferedWriter
 
-    private var blobDir: File? = null
-    private val csvFile: File = File(fileName)
+    private val blobDir: Path
 
     init {
-        val dir = csvFile.parentFile
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        output = Files.newBufferedWriter(csvFile.toPath(), UTF_8)
+        createDirectories(csvFile.parent)
+        output = newBufferedWriter(csvFile, UTF_8)
+
+        blobDir = Path.of(csvFile.parent.toString(), csvFile.nameWithoutExtension)
+        createDirectories(blobDir)
     }
 
     @Throws(IOException::class)
@@ -106,55 +105,38 @@ constructor(fileName: String) : BaseDBPipeline(), Closeable {
 
     @Throws(SQLException::class)
     private fun saveBinaryStream(resultSet: ResultSet, columnIndex: Int): String {
-        if (blobDir == null) {
-            createBlobSubFolder()
-        }
-
         val blobId = UUID.randomUUID().toString()
-        val blobFile = File(blobDir, blobId + BLOB_FILE_EXT)
+        val blobFile = Path.of(blobDir.toString(), blobId + BLOB_FILE_EXT)
         try {
             resultSet.getBinaryStream(columnIndex).use { inputStream ->
-                FileOutputStream(blobFile).use { outputStream ->
+                newOutputStream(blobFile).use { outputStream ->
                     IOUtils.copy(inputStream, outputStream)
                     outputStream.flush()
                 }
             }
+            return blobId
         } catch (e: IOException) {
             throw SQLException(e)
         }
-
-        return blobId
     }
 
     @Throws(SQLException::class)
     private fun saveCharStream(resultSet: ResultSet, columnIndex: Int): String {
-        if (blobDir == null) {
-            createBlobSubFolder()
-        }
-
         val blobId = UUID.randomUUID().toString()
-        val blobFile = File(blobDir, blobId + BLOB_FILE_EXT)
+        val blobFile = Path.of(blobDir.toString(), blobId + BLOB_FILE_EXT)
         try {
             resultSet.getCharacterStream(columnIndex).use { reader ->
-                FileOutputStream(blobFile).use { outputStream ->
+                newOutputStream(blobFile).use { outputStream ->
                     IOUtils.copy(reader, outputStream, UTF_8)
                     outputStream.flush()
                 }
             }
+            return blobId
         } catch (e: IOException) {
             throw SQLException(e)
         }
-
-        return blobId
     }
-
-    private fun createBlobSubFolder() {
-        blobDir = File(csvFile.parentFile, csvFile.nameWithoutExtension)
-        if (!blobDir!!.exists()) {
-            blobDir!!.mkdirs()
-        }
-    }
-
+    
     companion object {
         const val BLOB_FILE_EXT = ".bin"
         private val CARRIAGE_RETURN = Pattern.compile("[\n\r]+")

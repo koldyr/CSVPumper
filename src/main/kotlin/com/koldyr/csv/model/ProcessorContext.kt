@@ -23,7 +23,7 @@ class ProcessorContext(
 
     private val queueLock = ReentrantReadWriteLock()
     private val pagesLock = ReentrantReadWriteLock()
-    var path: String? = null
+    var path: String = ""
 
     var pageSize: Long = Constants.PAGE_SIZE
     private val pages = ConcurrentHashMap<String, MutableList<PageBlockData>>(0)

@@ -9,14 +9,13 @@ import com.koldyr.csv.model.PoolType
 import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BatchDBProcessor
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets.*
-import java.nio.file.Files
+import java.nio.file.Files.*
+import java.nio.file.Path
 import java.sql.Connection
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
-import java.util.*
 import java.util.concurrent.Callable
 import kotlin.math.ceil
 import kotlin.math.min
@@ -37,22 +36,22 @@ class ImportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
 
         var connection: Connection? = null
 
-        val fileName = "${context.path}/$tableName.csv"
+        val csvFile = Path.of(context.path, "$tableName.csv")
         try {
-            FileToDBPipeline(fileName).use { dataPipeline ->
-                connection = context.get(PoolType.DESTINATION)
+            FileToDBPipeline(csvFile).use { pipeline ->
+                connection = context[PoolType.DESTINATION]
 
                 val usable = connection!!
                 if (!isOracle(usable)) {
                     usable.schema = context.dstSchema
                 }
 
-                val rowCount = getRowCount(fileName)
+                val rowCount = getRowCount(csvFile)
 
                 if (rowCount > context.pageSize) {
-                    parallelImport(usable, dataPipeline, tableName, rowCount)
+                    parallelImport(usable, pipeline, tableName, rowCount)
                 } else {
-                    singleImport(usable, dataPipeline, tableName, rowCount)
+                    singleImport(usable, pipeline, tableName, rowCount)
                 }
 
                 if (LOGGER.isDebugEnabled) {
@@ -69,15 +68,14 @@ class ImportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
     }
 
     @Throws(IOException::class)
-    private fun getRowCount(fileName: String): Long {
-        val stream = Files.newInputStream(File(fileName).toPath())
-        return stream.bufferedReader(UTF_8).use {
-            reader -> reader.lines().count()
+    private fun getRowCount(csvFile: Path): Long {
+        return newBufferedReader(csvFile, UTF_8).use { reader ->
+            reader.lines().count()
         }
     }
 
     @Throws(InterruptedException::class, SQLException::class)
-    private fun parallelImport(connection: Connection, dataPipeline: FileToDBPipeline, tableName: String, rowCount: Long) {
+    private fun parallelImport(connection: Connection, pipeline: FileToDBPipeline, tableName: String, rowCount: Long) {
         val pageCount = ceil(rowCount / context.pageSize.toDouble()).toInt()
 
         LOGGER.debug("Import {} pages", pageCount)
@@ -96,7 +94,7 @@ class ImportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
 
         val importThreads = ArrayList<Callable<Int>>(threadCount)
         for (i in 0 until threadCount) {
-            importThreads.add(PageImportProcessor(context, tableName, metaData, dataPipeline, insertSql))
+            importThreads.add(PageImportProcessor(context, tableName, metaData, pipeline, insertSql))
         }
 
         val results = context.executor.invokeAll(importThreads)
@@ -129,7 +127,7 @@ class ImportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
     }
 
     /**
-     * Intentionally left resources opened. Not all drivers allow to work with ResultSetMetaData after statement closed.
+     * Intentionally left resources opened. Not all drivers allow work with ResultSetMetaData after statement closed.
      * @param connection
      * @param tableName
      * @return

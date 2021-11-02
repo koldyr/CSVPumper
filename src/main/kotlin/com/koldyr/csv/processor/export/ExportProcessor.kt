@@ -10,9 +10,9 @@ import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BatchDBProcessor
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.Path
 import java.sql.Connection
 import java.sql.SQLException
-import java.util.*
 import java.util.concurrent.Callable
 import kotlin.math.ceil
 import kotlin.math.min
@@ -29,12 +29,12 @@ class ExportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
         val start = System.currentTimeMillis()
         Thread.currentThread().name = tableName
 
-        val fileName = "${context.path}/$tableName.csv"
+        val csvFile = Path.of(context.path, "$tableName.csv")
 
         var connection: Connection? = null
         try {
-            DBToFilePipeline(fileName).use { dataPipeline ->
-                connection = context.get(PoolType.SOURCE)
+            DBToFilePipeline(csvFile).use { dataPipeline ->
+                connection = context[PoolType.SOURCE]
                 val rowCount = getRowCount(connection!!, tableName)
 
                 LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount))

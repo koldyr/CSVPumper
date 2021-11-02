@@ -15,6 +15,7 @@ import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Statement
 import java.util.concurrent.Callable
+import kotlin.math.min
 import kotlin.math.roundToLong
 
 /**
@@ -45,16 +46,16 @@ class PageCopyProcessor(
             val startPage = System.currentTimeMillis()
             LOGGER.debug("Starting {} page {}", tableName, pageBlock.index)
 
-            val commandSrcConn = Callable{ context.get(PoolType.SOURCE) }
+            val commandSrcConn = Callable{ context[PoolType.SOURCE] }
             val getSrcConnection = RetryCall(commandSrcConn, 30, 2000, true)
             srcConnection = getSrcConnection.call()
             srcStatement = srcConnection!!.createStatement()
-            srcStatement!!.fetchSize = Math.min(FETCH_SIZE.toLong(), pageBlock.length).toInt()
+            srcStatement!!.fetchSize = min(FETCH_SIZE.toLong(), pageBlock.length).toInt()
 
             val sql = SQLStatementFactory.getPageSQL(srcConnection, pageBlock, context.srcSchema, tableName)
             srcResultSet = srcStatement.executeQuery(sql)
 
-            val commandDstConn = Callable{ context.get(PoolType.DESTINATION) }
+            val commandDstConn = Callable{ context[PoolType.DESTINATION] }
             val getDstConnection = RetryCall(commandDstConn, 30, 2000, true)
             dstConnection = getDstConnection.call()
             dstStatement = dstConnection!!.prepareStatement(sqlInsert)
@@ -80,13 +81,13 @@ class PageCopyProcessor(
             }
         } finally {
             try {
-                srcResultSet?.close()
-                srcStatement?.close()
+                srcResultSet!!.close()
+                srcStatement!!.close()
                 if (srcConnection != null) {
                     context.release(PoolType.SOURCE, srcConnection)
                 }
 
-                dstStatement?.close()
+                dstStatement!!.close()
                 if (dstConnection != null) {
                     context.release(PoolType.DESTINATION, dstConnection)
                 }

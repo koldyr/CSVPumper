@@ -18,9 +18,11 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets.*
 import java.nio.file.Files
 import java.sql.Connection
+import java.time.Duration.*
 import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import kotlin.math.min
 
 /**
  * Description of class CSVExport
@@ -50,7 +52,7 @@ object CSVBatchProcessor {
 
         loadProcessConfig(connectionsPool)
 
-        val threadCount = Math.min(Constants.PARALLEL_TABLES, tableNames.size)
+        val threadCount = min(Constants.PARALLEL_TABLES, tableNames.size)
         val executor = Executors.newCachedThreadPool()
 
         try {
@@ -93,7 +95,7 @@ object CSVBatchProcessor {
             val srcMaxConnections = getMaxConnections(connectionsPool, PoolType.SOURCE)
             val dstMaxConnections = getMaxConnections(connectionsPool, PoolType.DESTINATION)
 
-            val mxCons = Arrays.asList(Constants.MAX_CONNECTIONS, srcMaxConnections, dstMaxConnections)
+            val mxCons = listOf(Constants.MAX_CONNECTIONS, srcMaxConnections, dstMaxConnections)
             Constants.MAX_CONNECTIONS = Collections.min(mxCons)
         } catch (e: Exception) {
             LOGGER.error(e.message, e)
@@ -123,12 +125,12 @@ object CSVBatchProcessor {
 
     private fun createConnectionsPool(srcConfig: ConnectionData, dstConfig: ConnectionData): KeyedObjectPool<PoolType, Connection> {
         val factory = ConnectionsFactory(srcConfig, dstConfig)
-        val config = GenericKeyedObjectPoolConfig()
+        val config = GenericKeyedObjectPoolConfig<Connection>()
         config.maxTotalPerKey = Constants.MAX_CONNECTIONS
         config.maxIdlePerKey = 1
-        config.minEvictableIdleTimeMillis = 100
+        config.minEvictableIdleTime = ofMillis(100)
         config.numTestsPerEvictionRun = 100
-        config.timeBetweenEvictionRunsMillis = 1000
+        config.timeBetweenEvictionRuns = ofMillis(1000)
         return GenericKeyedObjectPool(factory, config)
     }
 
