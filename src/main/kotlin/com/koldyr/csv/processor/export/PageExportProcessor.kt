@@ -1,5 +1,13 @@
 package com.koldyr.csv.processor.export
 
+import java.io.IOException
+import java.sql.Connection
+import java.sql.ResultSet
+import java.sql.SQLException
+import java.util.concurrent.Callable
+import kotlin.math.min
+import kotlin.math.roundToLong
+import org.slf4j.LoggerFactory
 import com.koldyr.csv.Constants.FETCH_SIZE
 import com.koldyr.csv.db.SQLStatementFactory
 import com.koldyr.csv.io.DBToFilePipeline
@@ -8,14 +16,6 @@ import com.koldyr.csv.model.PoolType
 import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BasePageProcessor
 import com.koldyr.csv.processor.RetryCall
-import org.slf4j.LoggerFactory
-import java.io.IOException
-import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.util.concurrent.Callable
-import kotlin.math.min
-import kotlin.math.roundToLong
 
 /**
  * Description of class PageExportProcessor
@@ -70,7 +70,7 @@ class PageExportProcessor(
             }
         } finally {
             try {
-                if (connection != null) {
+                connection?.let {
                     context.release(PoolType.SOURCE, connection)
                 }
             } catch (e: Exception) {

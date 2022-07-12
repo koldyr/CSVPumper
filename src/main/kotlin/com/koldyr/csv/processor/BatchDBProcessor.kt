@@ -1,15 +1,15 @@
 package com.koldyr.csv.processor
 
-import com.koldyr.csv.db.SQLStatementFactory
-import com.koldyr.csv.model.PoolType
-import com.koldyr.csv.model.ProcessorContext
-import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.sql.SQLException
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.db.SQLStatementFactory
+import com.koldyr.csv.model.PoolType
+import com.koldyr.csv.model.ProcessorContext
 
 /**
  * Description of class DBProcessor
@@ -72,7 +72,7 @@ abstract class BatchDBProcessor
     }
 
     protected fun release(connection: Connection?, type: PoolType) {
-        if (connection != null) {
+        connection?.let {
             try {
                 context.release(type, connection)
             } catch (e: Exception) {

@@ -1,9 +1,5 @@
 package com.koldyr.csv.io
 
-import com.koldyr.csv.io.DBToFilePipeline.Companion.BLOB_FILE_EXT
-import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.commons.lang3.StringUtils
-import org.postgresql.core.Oid
 import java.io.BufferedReader
 import java.io.CharArrayWriter
 import java.io.Closeable
@@ -24,12 +20,16 @@ import java.sql.Timestamp
 import java.sql.Types
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.*
 import java.time.format.DateTimeParseException
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.regex.Pattern
 import kotlin.io.path.nameWithoutExtension
+import org.apache.commons.lang3.StringUtils
+import org.apache.commons.text.StringEscapeUtils.*
+import org.postgresql.core.Oid
+import com.koldyr.csv.io.DBToFilePipeline.Companion.BLOB_FILE_EXT
 
 /**
  * Pipeline to load data from cvs file to database table
@@ -133,7 +133,7 @@ constructor(csvFile: Path) : BaseDBPipeline(), Closeable {
             }
         }
 
-        var v = StringEscapeUtils.unescapeCsv(value)
+        var v = unescapeCsv(value)
         val carriageReturn = CARRIAGE_RETURN.matcher(v)
         if (carriageReturn.find()) {
             v = carriageReturn.replaceAll(CR_REPLACEMENT)
@@ -145,17 +145,16 @@ constructor(csvFile: Path) : BaseDBPipeline(), Closeable {
             Types.BIGINT -> statement.setLong(columnIndex, java.lang.Long.parseLong(v))
             Types.FLOAT -> statement.setFloat(columnIndex, java.lang.Float.parseFloat(v))
             Types.DATE -> {
-                var date: LocalDate
-                try {
-                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE)
+                val date = try {
+                    LocalDate.parse(v, ISO_LOCAL_DATE)
                 } catch (e: DateTimeParseException) {
-                    date = LocalDate.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    LocalDate.parse(v, ISO_LOCAL_DATE_TIME)
                 }
 
                 statement.setDate(columnIndex, Date.valueOf(date))
             }
             Types.TIMESTAMP -> {
-                val dateTime = LocalDateTime.parse(v, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val dateTime = LocalDateTime.parse(v, ISO_LOCAL_DATE_TIME)
                 statement.setTimestamp(columnIndex, Timestamp.valueOf(dateTime))
             }
             Types.NUMERIC -> statement.setBigDecimal(columnIndex, BigDecimal(v))

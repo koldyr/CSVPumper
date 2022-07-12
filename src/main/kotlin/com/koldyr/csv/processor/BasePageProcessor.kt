@@ -1,13 +1,13 @@
 package com.koldyr.csv.processor
 
-import com.koldyr.csv.model.PageBlockData
-import com.koldyr.csv.model.ProcessorContext
-import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.sql.SQLException
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.concurrent.Callable
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.model.PageBlockData
+import com.koldyr.csv.model.ProcessorContext
 
 /**
  * Description of class BasePageProcessor
@@ -15,10 +15,11 @@ import java.util.concurrent.Callable
  * @created: 2018.03.10
  */
 abstract class BasePageProcessor
-    protected constructor(
-            protected val tableName: String,
-            protected val context: ProcessorContext) : Callable<Int> {
-    
+protected constructor(
+    protected val tableName: String,
+    protected val context: ProcessorContext
+) : Callable<Int> {
+
     protected val format: DecimalFormat
 
     init {

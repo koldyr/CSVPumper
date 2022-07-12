@@ -1,12 +1,12 @@
 package com.koldyr.csv.model
 
-import com.koldyr.csv.Constants
-import org.apache.commons.pool2.KeyedObjectPool
-import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import org.apache.commons.pool2.KeyedObjectPool
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.Constants
 
 /**
  * Description of class ProcessorConfig
@@ -14,11 +14,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
  * @created: 2018.03.04
  */
 class ProcessorContext(
-        private val connectionsPool: KeyedObjectPool<PoolType, Connection>,
-        private val tableNames: MutableList<String>,
-        val executor: ExecutorService,
-        var dstSchema: String,
-        var srcSchema: String
+    private val connectionsPool: KeyedObjectPool<PoolType, Connection>,
+    private val tableNames: MutableList<String>,
+    val executor: ExecutorService,
+    var dstSchema: String,
+    var srcSchema: String
 ) {
 
     private val queueLock = ReentrantReadWriteLock()

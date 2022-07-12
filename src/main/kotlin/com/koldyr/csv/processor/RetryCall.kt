@@ -1,8 +1,8 @@
 package com.koldyr.csv.processor
 
-import org.slf4j.LoggerFactory
 import java.util.concurrent.Callable
 import kotlin.math.min
+import org.slf4j.LoggerFactory
 
 /**
  * Description of class RetryCall
@@ -10,11 +10,12 @@ import kotlin.math.min
  * @created: 2018.03.07
  */
 class RetryCall<V>(
-        private val command: Callable<V>,
-        private val recover: Runnable?,
-        private var maxAttempts: Int,
-        private var backOffPeriod: Int,
-        private val exponentialBackOff: Boolean) {
+    private val command: Callable<V>,
+    private val recover: Runnable?,
+    private var maxAttempts: Int,
+    private var backOffPeriod: Int,
+    private val exponentialBackOff: Boolean
+) {
 
     constructor(command: Callable<V>, maxAttempts: Int, backOffPeriod: Int, exponentialBackOff: Boolean) : this(command, null, maxAttempts, backOffPeriod, exponentialBackOff)
 

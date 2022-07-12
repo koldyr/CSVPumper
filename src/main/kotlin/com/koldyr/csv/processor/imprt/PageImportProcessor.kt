@@ -1,12 +1,5 @@
 package com.koldyr.csv.processor.imprt
 
-import com.koldyr.csv.io.FileToDBPipeline
-import com.koldyr.csv.model.PageBlockData
-import com.koldyr.csv.model.PoolType
-import com.koldyr.csv.model.ProcessorContext
-import com.koldyr.csv.processor.BasePageProcessor
-import com.koldyr.csv.processor.RetryCall
-import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -14,6 +7,13 @@ import java.sql.ResultSetMetaData
 import java.sql.SQLException
 import java.util.concurrent.Callable
 import kotlin.math.roundToLong
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.io.FileToDBPipeline
+import com.koldyr.csv.model.PageBlockData
+import com.koldyr.csv.model.PoolType
+import com.koldyr.csv.model.ProcessorContext
+import com.koldyr.csv.processor.BasePageProcessor
+import com.koldyr.csv.processor.RetryCall
 
 /**
  * Description of class PageImportProcessor
@@ -21,11 +21,12 @@ import kotlin.math.roundToLong
  * @created: 2018.03.07
  */
 class PageImportProcessor(
-        context: ProcessorContext,
-        tableName: String,
-        private val metaData: ResultSetMetaData,
-        private val pipeline: FileToDBPipeline,
-        private val insertSql: String) : BasePageProcessor(tableName, context) {
+    context: ProcessorContext,
+    tableName: String,
+    private val metaData: ResultSetMetaData,
+    private val pipeline: FileToDBPipeline,
+    private val insertSql: String
+) : BasePageProcessor(tableName, context) {
 
     @Throws(SQLException::class, IOException::class)
     override fun execute(pageBlock: PageBlockData) {
@@ -52,7 +53,7 @@ class PageImportProcessor(
                 counter++
 
                 if (counter % step == 0.0) {
-                    val commandExecuteBatch = Callable<IntArray> { statement!!.executeBatch() }
+                    val commandExecuteBatch = Callable { statement!!.executeBatch() }
                     val executeBatch = RetryCall(commandExecuteBatch, 3, 1000, false)
                     executeBatch.call()
                     connection.commit()
@@ -75,7 +76,7 @@ class PageImportProcessor(
             try {
                 statement?.close()
 
-                if (connection != null) {
+                connection?.let {
                     context.release(PoolType.DESTINATION, connection)
                 }
             } catch (e: Exception) {

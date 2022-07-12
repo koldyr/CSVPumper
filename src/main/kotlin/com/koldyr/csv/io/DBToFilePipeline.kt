@@ -1,9 +1,5 @@
 package com.koldyr.csv.io
 
-import org.apache.commons.io.IOUtils
-import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.commons.lang3.StringUtils
-import org.postgresql.core.Oid
 import java.io.BufferedWriter
 import java.io.Closeable
 import java.io.IOException
@@ -13,10 +9,14 @@ import java.nio.file.Path
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Types
-import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.*
 import java.util.*
 import java.util.regex.Pattern
 import kotlin.io.path.nameWithoutExtension
+import org.apache.commons.io.IOUtils
+import org.apache.commons.lang3.StringUtils
+import org.apache.commons.text.StringEscapeUtils
+import org.postgresql.core.Oid
 
 /**
  * Pipeline to load data from db table into csv file. Blob/clob columns will be stored in dedicated sub-folder
@@ -89,12 +89,12 @@ constructor(csvFile: Path) : BaseDBPipeline(), Closeable {
             Types.DATE -> {
                 val date = resultSet.getDate(columnIndex) ?: return null
 
-                return DateTimeFormatter.ISO_LOCAL_DATE.format(date.toLocalDate())
+                return ISO_LOCAL_DATE.format(date.toLocalDate())
             }
             Types.TIMESTAMP -> {
                 val timestamp = resultSet.getTimestamp(columnIndex) ?: return null
 
-                return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(timestamp.toLocalDateTime())
+                return ISO_LOCAL_DATE_TIME.format(timestamp.toLocalDateTime())
             }
             Types.NUMERIC -> return resultSet.getBigDecimal(columnIndex)
             Types.CLOB, Types.NCLOB -> return saveCharStream(resultSet, columnIndex)

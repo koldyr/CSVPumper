@@ -1,17 +1,5 @@
 package com.koldyr.csv
 
-import com.koldyr.csv.db.ConnectionsFactory
-import com.koldyr.csv.model.ConnectionData
-import com.koldyr.csv.model.Operation
-import com.koldyr.csv.model.PoolType
-import com.koldyr.csv.model.ProcessorContext
-import com.koldyr.csv.processor.copy.CopyProcessor
-import com.koldyr.csv.processor.export.ExportProcessor
-import com.koldyr.csv.processor.imprt.ImportProcessor
-import org.apache.commons.pool2.KeyedObjectPool
-import org.apache.commons.pool2.impl.GenericKeyedObjectPool
-import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig
-import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -23,6 +11,18 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import kotlin.math.min
+import org.apache.commons.pool2.KeyedObjectPool
+import org.apache.commons.pool2.impl.GenericKeyedObjectPool
+import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.db.ConnectionsFactory
+import com.koldyr.csv.model.ConnectionData
+import com.koldyr.csv.model.Operation
+import com.koldyr.csv.model.PoolType
+import com.koldyr.csv.model.ProcessorContext
+import com.koldyr.csv.processor.copy.CopyProcessor
+import com.koldyr.csv.processor.export.ExportProcessor
+import com.koldyr.csv.processor.imprt.ImportProcessor
 
 /**
  * Description of class CSVExport
@@ -38,7 +38,7 @@ object CSVBatchProcessor {
     fun main(args: Array<String>) {
         val dbConfig = Properties()
 
-        FileInputStream("db-config.properties").use { inputStream -> dbConfig.load(inputStream) }
+        FileInputStream("db-config.properties").use { input -> dbConfig.load(input) }
 
         val operation = Operation.valueOf(dbConfig.getProperty("operation"))
         val srcConfig = getDBConfig(dbConfig, "source")
@@ -78,9 +78,9 @@ object CSVBatchProcessor {
 
     private fun getDBConfig(params: Properties, prefix: String): ConnectionData {
         return ConnectionData(params.getProperty("$prefix.url"),
-                params.getProperty("$prefix.schema"),
-                params.getProperty("$prefix.user"),
-                params.getProperty("$prefix.password"))
+            params.getProperty("$prefix.schema"),
+            params.getProperty("$prefix.user"),
+            params.getProperty("$prefix.password"))
     }
 
     private fun loadProcessConfig(connectionsPool: KeyedObjectPool<PoolType, Connection>) {
@@ -104,19 +104,16 @@ object CSVBatchProcessor {
 
     @Throws(Exception::class)
     private fun getMaxConnections(connectionsPool: KeyedObjectPool<PoolType, Connection>, type: PoolType): Int {
-        var result: Int
-        var connection: Connection? = null
-        try {
-            connection = connectionsPool.borrowObject(type)
-            val databaseMetaData = connection!!.metaData
-            result = databaseMetaData.maxConnections
-            if (result == 0) {
-                result = Integer.MAX_VALUE
-            }
-        } catch (e: Exception) {
-            result = Integer.MAX_VALUE
-        } finally {
-            if (connection != null) {
+        val result = connectionsPool.borrowObject(type).use { connection ->
+            try {
+                val databaseMetaData = connection!!.metaData
+                if (databaseMetaData.maxConnections == 0) {
+                    Integer.MAX_VALUE
+                }
+                databaseMetaData.maxConnections
+            } catch (e: Exception) {
+                Integer.MAX_VALUE
+            } finally {
                 connectionsPool.returnObject(type, connection)
             }
         }
