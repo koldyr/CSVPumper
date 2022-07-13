@@ -16,6 +16,7 @@ import com.koldyr.csv.model.PoolType
 import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BasePageProcessor
 import com.koldyr.csv.processor.RetryCall
+import com.koldyr.util.executeWithTimer
 
 /**
  * Description of class PageExportProcessor
@@ -23,9 +24,10 @@ import com.koldyr.csv.processor.RetryCall
  * @created: 2018.03.05
  */
 class PageExportProcessor(
-        context: ProcessorContext,
-        tableName: String,
-        private val dataPipeline: DBToFilePipeline) : BasePageProcessor(tableName, context) {
+    context: ProcessorContext,
+    tableName: String,
+    private val dataPipeline: DBToFilePipeline
+) : BasePageProcessor(tableName, context) {
 
     @Throws(SQLException::class, IOException::class)
     override fun execute(pageBlock: PageBlockData) {
@@ -35,38 +37,32 @@ class PageExportProcessor(
 
         var connection: Connection? = null
         try {
-            val startPage = System.currentTimeMillis()
-            LOGGER.debug("Starting {} page {}", tableName, pageBlock.index)
+            executeWithTimer("$tableName page ${pageBlock.index}") {
+                val command = Callable { context[PoolType.SOURCE] }
+                val getConnection = RetryCall(command, 30, 2000, true)
+                connection = getConnection.call()
 
-            val command = Callable{ context[PoolType.SOURCE] }
-            val getConnection = RetryCall(command, 30, 2000, true)
-            connection = getConnection.call()
+                connection!!.createStatement().use { statement ->
+                    statement.fetchSize = min(FETCH_SIZE.toLong(), pageBlock.length).toInt()
+                    val sql = SQLStatementFactory.getPageSQL(connection!!, pageBlock, context.srcSchema, tableName)
 
-            connection!!.createStatement().use { statement ->
-                statement.fetchSize = min(FETCH_SIZE.toLong(), pageBlock.length).toInt()
-                val sql = SQLStatementFactory.getPageSQL(connection, pageBlock, context.srcSchema, tableName)
+                    statement.executeQuery(sql).use { resultSet ->
+                        val columnCount = getColumnCount(resultSet, sql)
 
-                statement.executeQuery(sql).use { resultSet ->
-                    val columnCount = getColumnCount(resultSet, sql)
+                        var counter = 0
+                        while (dataPipeline.next(resultSet, columnCount)) {
+                            counter++
 
-                    var counter = 0
-                    while (dataPipeline.next(resultSet, columnCount)) {
-                        counter++
-
-                        if (counter % step == 0.0) {
-                            dataPipeline.flush()
-                            val percent = (counter / pageBlock.length * 100.0).roundToLong()
-                            LOGGER.debug("\t{}%", percent)
+                            if (counter % step == 0.0) {
+                                dataPipeline.flush()
+                                val percent = (counter / pageBlock.length * 100.0).roundToLong()
+                                LOGGER.debug("\t{}%", percent)
+                            }
                         }
                     }
                 }
-            }
 
-            dataPipeline.flush()
-
-            if (LOGGER.isDebugEnabled) {
-                val duration = format.format(System.currentTimeMillis() - startPage)
-                LOGGER.debug("Finished {} page {} in {} ms", tableName, pageBlock.index, duration)
+                dataPipeline.flush()
             }
         } finally {
             try {

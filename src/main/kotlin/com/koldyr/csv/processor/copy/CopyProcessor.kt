@@ -1,5 +1,12 @@
 package com.koldyr.csv.processor.copy
 
+import java.sql.Connection
+import java.sql.SQLException
+import java.util.concurrent.Callable
+import kotlin.math.ceil
+import kotlin.math.min
+import kotlin.math.roundToLong
+import org.slf4j.LoggerFactory
 import com.koldyr.csv.Constants.FETCH_SIZE
 import com.koldyr.csv.Constants.PARALLEL_PAGES
 import com.koldyr.csv.db.SQLStatementFactory
@@ -8,13 +15,7 @@ import com.koldyr.csv.model.PageBlockData
 import com.koldyr.csv.model.PoolType
 import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BatchDBProcessor
-import org.slf4j.LoggerFactory
-import java.sql.Connection
-import java.sql.SQLException
-import java.util.concurrent.Callable
-import kotlin.math.ceil
-import kotlin.math.min
-import kotlin.math.roundToLong
+import com.koldyr.util.executeWithTimer
 
 /**
  * Description of class CopyProcessor
@@ -24,10 +25,7 @@ import kotlin.math.roundToLong
 class CopyProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
 
     override fun processTable(tableName: String) {
-        val start = System.currentTimeMillis()
         Thread.currentThread().name = tableName
-
-        val dataPipeline = DbToDbPipeline()
 
         var srcConnection: Connection? = null
         var dstConnection: Connection? = null
@@ -36,23 +34,19 @@ class CopyProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
             dstConnection = context[PoolType.DESTINATION]
             val rowCount = getRowCount(srcConnection, tableName)
 
-            LOGGER.debug("Starting table {}: {} rows", tableName, format.format(rowCount))
+            executeWithTimer("table $tableName: ${format.format(rowCount)} rows") {
+                val dataPipeline = DbToDbPipeline()
 
-            if (rowCount > context.pageSize) {
-                release(srcConnection, PoolType.SOURCE)
-                release(dstConnection, PoolType.DESTINATION)
-                srcConnection = null //don't release this connection in finally block
-                dstConnection = null //don't release this connection in finally block
+                if (rowCount > context.pageSize) {
+                    release(srcConnection, PoolType.SOURCE)
+                    release(dstConnection, PoolType.DESTINATION)
+                    srcConnection = null //don't release this connection in finally block
+                    dstConnection = null //don't release this connection in finally block
 
-                parallelCopy(dataPipeline, tableName, rowCount)
-            } else {
-                copy(srcConnection, dstConnection, dataPipeline, tableName, rowCount)
-            }
-
-            if (LOGGER.isDebugEnabled) {
-                val count = format.format(rowCount)
-                val duration = format.format(System.currentTimeMillis() - start)
-                LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration)
+                    parallelCopy(dataPipeline, tableName, rowCount)
+                } else {
+                    copy(srcConnection!!, dstConnection!!, dataPipeline, tableName, rowCount)
+                }
             }
         } catch (e: Exception) {
             LOGGER.error(e.message, e)

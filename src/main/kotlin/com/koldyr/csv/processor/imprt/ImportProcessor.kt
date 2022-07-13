@@ -1,14 +1,5 @@
 package com.koldyr.csv.processor.imprt
 
-import com.koldyr.csv.Constants
-import com.koldyr.csv.db.DatabaseDetector.isOracle
-import com.koldyr.csv.db.SQLStatementFactory
-import com.koldyr.csv.io.FileToDBPipeline
-import com.koldyr.csv.model.PageBlockData
-import com.koldyr.csv.model.PoolType
-import com.koldyr.csv.model.ProcessorContext
-import com.koldyr.csv.processor.BatchDBProcessor
-import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.charset.StandardCharsets.*
 import java.nio.file.Files.*
@@ -20,6 +11,16 @@ import java.util.concurrent.Callable
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.roundToLong
+import org.slf4j.LoggerFactory
+import com.koldyr.csv.Constants
+import com.koldyr.csv.db.DatabaseDetector.isOracle
+import com.koldyr.csv.db.SQLStatementFactory
+import com.koldyr.csv.io.FileToDBPipeline
+import com.koldyr.csv.model.PageBlockData
+import com.koldyr.csv.model.PoolType
+import com.koldyr.csv.model.ProcessorContext
+import com.koldyr.csv.processor.BatchDBProcessor
+import com.koldyr.util.executeWithTimer
 
 /**
  * Description of class ImportProcessor
@@ -29,35 +30,26 @@ import kotlin.math.roundToLong
 class ImportProcessor(context: ProcessorContext) : BatchDBProcessor(context) {
 
     override fun processTable(tableName: String) {
-        val start = System.currentTimeMillis()
-
         Thread.currentThread().name = tableName
-        LOGGER.debug("Starting table {}", tableName)
-
         var connection: Connection? = null
 
-        val csvFile = Path.of(context.path, "$tableName.csv")
         try {
-            FileToDBPipeline(csvFile).use { pipeline ->
-                connection = context[PoolType.DESTINATION]
+            val csvFile = Path.of(context.path, "$tableName.csv")
+            executeWithTimer("table $tableName") {
+                FileToDBPipeline(csvFile).use { pipeline ->
+                    connection = context[PoolType.DESTINATION]
 
-                val usable = connection!!
-                if (!isOracle(usable)) {
-                    usable.schema = context.dstSchema
-                }
+                    val usable = connection!!
+                    if (!isOracle(usable)) {
+                        usable.schema = context.dstSchema
+                    }
 
-                val rowCount = getRowCount(csvFile)
-
-                if (rowCount > context.pageSize) {
-                    parallelImport(usable, pipeline, tableName, rowCount)
-                } else {
-                    singleImport(usable, pipeline, tableName, rowCount)
-                }
-
-                if (LOGGER.isDebugEnabled) {
-                    val count = format.format(rowCount)
-                    val duration = format.format(System.currentTimeMillis() - start)
-                    LOGGER.debug("Finished table {}: {} rows in {} ms", tableName, count, duration)
+                    val rowCount = getRowCount(csvFile)
+                    if (rowCount > context.pageSize) {
+                        parallelImport(usable, pipeline, tableName, rowCount)
+                    } else {
+                        singleImport(usable, pipeline, tableName, rowCount)
+                    }
                 }
             }
         } catch (e: Exception) {

@@ -19,7 +19,7 @@ class RetryCall<V>(
 
     constructor(command: Callable<V>, maxAttempts: Int, backOffPeriod: Int, exponentialBackOff: Boolean) : this(command, null, maxAttempts, backOffPeriod, exponentialBackOff)
 
-    fun call(): V? {
+    fun call(): V {
         var isSuccess = false
         var retryCount = 0
         var throwable: Throwable? = null
@@ -45,7 +45,7 @@ class RetryCall<V>(
             LOGGER.warn("Command failed - no recovery possible! #attempt: $retryCount", throwable)
             throw RuntimeException(throwable)
         }
-        return result
+        return result!!
     }
 
     private fun backOff() {
