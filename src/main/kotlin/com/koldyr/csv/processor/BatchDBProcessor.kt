@@ -42,7 +42,7 @@ abstract class BatchDBProcessor
     @Throws(InterruptedException::class)
     protected fun checkResults(tableName: String, pageCount: Int, results: Collection<Future<Int>>) {
         val count = results.stream().mapToInt { result ->
-            return@mapToInt try {
+            try {
                 result.get()
             } catch (e: Exception) {
                 0

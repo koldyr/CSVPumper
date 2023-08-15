@@ -9,7 +9,7 @@ import kotlin.math.roundToLong
 import org.slf4j.LoggerFactory
 import com.koldyr.csv.io.FileToDBPipeline
 import com.koldyr.csv.model.PageBlockData
-import com.koldyr.csv.model.PoolType
+import com.koldyr.csv.model.PoolType.DESTINATION
 import com.koldyr.csv.model.ProcessorContext
 import com.koldyr.csv.processor.BasePageProcessor
 import com.koldyr.csv.processor.RetryCall
@@ -38,7 +38,7 @@ class PageImportProcessor(
         var connection: Connection? = null
         try {
             executeWithTimer("$tableName page ${pageBlock.index}") {
-                val commandGetConnection: Callable<Connection> = Callable { context.get(PoolType.DESTINATION) }
+                val commandGetConnection: Callable<Connection> = Callable { context.get(DESTINATION) }
                 val getConnection = RetryCall(commandGetConnection, 30, 1000, true)
 
                 connection = getConnection.call()
@@ -67,7 +67,7 @@ class PageImportProcessor(
         } finally {
             connection?.let {
                 try {
-                    context.release(PoolType.DESTINATION, connection)
+                    context.release(DESTINATION, connection)
                 } catch (e: Exception) {
                     LOGGER.error(e.message, e)
                 }

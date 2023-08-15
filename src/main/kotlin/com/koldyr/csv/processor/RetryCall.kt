@@ -17,7 +17,8 @@ class RetryCall<V>(
     private val exponentialBackOff: Boolean
 ) {
 
-    constructor(command: Callable<V>, maxAttempts: Int, backOffPeriod: Int, exponentialBackOff: Boolean) : this(command, null, maxAttempts, backOffPeriod, exponentialBackOff)
+    constructor(command: Callable<V>, maxAttempts: Int, backOffPeriod: Int, exponentialBackOff: Boolean) :
+        this(command, null, maxAttempts, backOffPeriod, exponentialBackOff)
 
     fun call(): V {
         var isSuccess = false
@@ -67,7 +68,6 @@ class RetryCall<V>(
             } catch (ex: Throwable) {
                 LOGGER.error(ex.message, ex)
             }
-
         }
     }
 

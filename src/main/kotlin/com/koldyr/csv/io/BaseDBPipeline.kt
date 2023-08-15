@@ -1,10 +1,5 @@
 package com.koldyr.csv.io
 
-import com.koldyr.csv.db.DatabaseDetector.isBLOBSupported
-import com.koldyr.csv.db.DatabaseDetector.isCLOBSupported
-import com.koldyr.csv.db.DatabaseDetector.isMsSQLServer
-import com.koldyr.csv.db.DatabaseDetector.isPostgreSQL
-import org.postgresql.core.Oid
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets.*
@@ -12,6 +7,11 @@ import java.sql.PreparedStatement
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
 import java.sql.Types
+import org.postgresql.core.Oid
+import com.koldyr.csv.db.DatabaseDetector.isBLOBSupported
+import com.koldyr.csv.db.DatabaseDetector.isCLOBSupported
+import com.koldyr.csv.db.DatabaseDetector.isMsSQLServer
+import com.koldyr.csv.db.DatabaseDetector.isPostgreSQL
 
 /**
  * Description of class BaseDBPipeline
@@ -25,25 +25,35 @@ abstract class BaseDBPipeline {
 
     protected fun isLOB(columnType: Int): Boolean {
         return (columnType == Types.BLOB || columnType == Types.CLOB || columnType == Types.NCLOB || columnType == Types.BINARY || columnType == Types.LONGVARBINARY
-                || columnType == Oid.TEXT)
+            || columnType == Oid.TEXT)
     }
 
     @Throws(SQLException::class)
     protected fun setLOB(destination: PreparedStatement, columnIndex: Int, columnType: Int, lob: InputStream) {
         when (columnType) {
-            Types.BLOB -> if (isBLOBSupported(destination)) {
-                destination.setBlob(columnIndex, lob)
-            } else {
+            Types.BLOB -> {
+                if (isBLOBSupported(destination)) {
+                    destination.setBlob(columnIndex, lob)
+                } else {
+                    destination.setBinaryStream(columnIndex, lob)
+                }
+            }
+            Types.CLOB -> {
+                if (isCLOBSupported(destination)) {
+                    destination.setClob(columnIndex, InputStreamReader(lob, UTF_8))
+                } else {
+                    destination.setCharacterStream(columnIndex, InputStreamReader(lob, UTF_8))
+                }
+            }
+            Types.NCLOB -> {
+                destination.setNClob(columnIndex, InputStreamReader(lob, UTF_8))
+            }
+            Types.BINARY, Types.LONGVARBINARY -> {
                 destination.setBinaryStream(columnIndex, lob)
             }
-            Types.CLOB -> if (isCLOBSupported(destination)) {
-                destination.setClob(columnIndex, InputStreamReader(lob, UTF_8))
-            } else {
+            Oid.TEXT -> {
                 destination.setCharacterStream(columnIndex, InputStreamReader(lob, UTF_8))
             }
-            Types.NCLOB -> destination.setNClob(columnIndex, InputStreamReader(lob, UTF_8))
-            Types.BINARY, Types.LONGVARBINARY -> destination.setBinaryStream(columnIndex, lob)
-            Oid.TEXT -> destination.setCharacterStream(columnIndex, InputStreamReader(lob, UTF_8))
         }
     }
 
